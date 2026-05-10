@@ -20,7 +20,10 @@ def bin_path(name: str) -> str:
 
 
 def wrapper_path(name: str) -> str:
-    return str(ROOT / "bin" / name)
+    wrapper = ROOT / "bin" / name
+    if wrapper.exists():
+        return str(wrapper)
+    return bin_path(name)
 
 
 def run(cmd: list[str], *, check: bool = True, cwd: Path = ROOT) -> subprocess.CompletedProcess[str]:
