@@ -19,8 +19,12 @@ def bin_path(name: str) -> str:
     return shutil.which(name) or str(Path.home() / f".local/bin/{name}")
 
 
-def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, cwd=ROOT, check=check, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+def wrapper_path(name: str) -> str:
+    return str(ROOT / "bin" / name)
+
+
+def run(cmd: list[str], *, check: bool = True, cwd: Path = ROOT) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(cmd, cwd=cwd, check=check, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
 def write_json(path: Path, spec: dict) -> None:
@@ -50,6 +54,26 @@ def average_frame(video: Path, timestamp: float) -> float:
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="video-compose-selftest-") as tmp:
         tmpdir = Path(tmp)
+
+        templates = run([bin_path("video-compose"), "templates"]).stdout.splitlines()
+        if "media-card" not in templates or "split-screen" not in templates:
+            raise SystemExit(f"template list selftest failed: {templates}")
+        initialized = tmpdir / "initialized.json"
+        run([bin_path("video-compose"), "init", "media-card", str(initialized)])
+        run([bin_path("video-compose"), "--validate-only", str(initialized)])
+        shown = run([bin_path("video-compose"), "show", "template:media-card"]).stdout
+        if "examples/assets/sample.ppm" not in shown:
+            raise SystemExit("template show selftest failed: expected portable sample asset path")
+        failed = run([bin_path("video-compose"), "templates", "unexpected"], check=False)
+        if failed.returncode == 0:
+            raise SystemExit("extra-argument selftest failed")
+
+        external = tmpdir / "external"
+        external.mkdir()
+        run([wrapper_path("video-compose"), "init", "media-card", "starter.json"], cwd=external)
+        run([wrapper_path("video-compose"), "--validate-only", "starter.json"], cwd=external)
+        if not (external / "examples" / "assets" / "sample.ppm").exists():
+            raise SystemExit("wrapper init asset-copy selftest failed")
 
         opacity_spec = {
             "size": "160x90",

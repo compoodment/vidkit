@@ -28,6 +28,7 @@ CAMERA_TYPES = {"none", "zoom_in", "zoom_out", "pan", "shake"}
 TRANSITION_TYPES = {"fade", "wipeleft", "wiperight", "slideleft", "slideright", "circleopen", "circleclose", "none"}
 EASING_TYPES = {"linear", "none", "in_quad", "ease_in", "out_quad", "ease_out", "in_out_quad", "in_cubic", "out_cubic", "in_out_cubic"}
 ANIMATION_PRESETS = {"fade", "fade_in", "fade_out", "slide_left", "slide_right", "slide_up", "slide_down", "pop", "none"}
+TEMPLATE_NAMES = ("lower-third", "motion-card", "glitch-card", "band-glitch", "media-card", "split-screen")
 
 
 def ffmpeg_bin(name: str | None = None) -> str:
@@ -1548,7 +1549,65 @@ def template_spec(name: str) -> dict[str, Any]:
                 }
             ],
         }
-    raise SystemExit(f"unknown template: {name} (try lower-third, motion-card, glitch-card, band-glitch, media-card, or split-screen)")
+    raise SystemExit(f"unknown template: {name} (try {', '.join(TEMPLATE_NAMES)})")
+
+
+def portable_spec(spec: Any) -> Any:
+    if isinstance(spec, dict):
+        return {key: portable_spec(value) for key, value in spec.items()}
+    if isinstance(spec, list):
+        return [portable_spec(value) for value in spec]
+    if isinstance(spec, str):
+        assets = repo_root() / "examples" / "assets"
+        try:
+            path = Path(spec)
+            if path.is_absolute() and path.is_relative_to(assets):
+                return str(Path("examples/assets") / path.relative_to(assets))
+        except ValueError:
+            pass
+    return spec
+
+
+def bundled_asset_refs(spec: Any) -> list[Path]:
+    refs: list[Path] = []
+    assets = repo_root() / "examples" / "assets"
+    if isinstance(spec, dict):
+        for value in spec.values():
+            refs.extend(bundled_asset_refs(value))
+    elif isinstance(spec, list):
+        for value in spec:
+            refs.extend(bundled_asset_refs(value))
+    elif isinstance(spec, str):
+        try:
+            path = Path(spec)
+            if path.is_absolute() and path.is_relative_to(assets):
+                refs.append(path)
+        except ValueError:
+            pass
+    return refs
+
+
+def copy_bundled_assets(spec: dict[str, Any], destination_root: Path) -> None:
+    assets = repo_root() / "examples" / "assets"
+    for source in bundled_asset_refs(spec):
+        relative = source.relative_to(assets)
+        destination = destination_root / "examples" / "assets" / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+
+
+def source_spec(source: str) -> dict[str, Any]:
+    if source == "demo":
+        return demo_spec()
+    if source.startswith("template:"):
+        return template_spec(source.split(":", 1)[1])
+    if source in TEMPLATE_NAMES:
+        return template_spec(source)
+    return load_spec(Path(source))
+
+
+def print_json(spec: dict[str, Any]) -> None:
+    print(json.dumps(portable_spec(spec), indent=2))
 
 
 def parse_size(value: str | tuple[int, int]) -> tuple[int, int]:
@@ -1885,24 +1944,52 @@ def render_spec(spec: dict[str, Any], out: Path, ffmpeg: str) -> None:
 
 def main() -> int:
     p = argparse.ArgumentParser(description="Render small original videos from scene specs.")
-    p.add_argument("source", help="JSON scene spec, 'demo', or 'template:<name>'")
+    p.add_argument("source", help="JSON scene spec, 'demo', 'template:<name>', or command: templates/init/show/validate")
     p.add_argument("out", type=Path, nargs="?")
+    p.add_argument("extra", type=Path, nargs="?")
     p.add_argument("--validate-only", action="store_true", help="validate the spec and exit without rendering")
     p.add_argument("--ffmpeg", default=ffmpeg_bin())
     args = p.parse_args()
     source = args.source
+
+    if source in {"templates", "list-templates"}:
+        if args.out is not None or args.extra is not None:
+            raise SystemExit("usage: video-compose templates")
+        print("\n".join(TEMPLATE_NAMES))
+        return 0
+
+    if source == "init":
+        if args.out is None or args.extra is None:
+            raise SystemExit("usage: video-compose init <template-name|demo> <out.json>")
+        spec = source_spec(str(args.out))
+        assert_valid_spec(spec)
+        args.extra.parent.mkdir(parents=True, exist_ok=True)
+        args.extra.write_text(json.dumps(portable_spec(spec), indent=2) + "\n", encoding="utf-8")
+        copy_bundled_assets(spec, args.extra.parent)
+        print(f"wrote {args.extra}")
+        return 0
+
+    if source == "show":
+        if args.out is None:
+            raise SystemExit("usage: video-compose show <spec|demo|template:name|template-name>")
+        if args.extra is not None:
+            raise SystemExit("usage: video-compose show <spec|demo|template:name|template-name>")
+        spec = source_spec(str(args.out))
+        assert_valid_spec(spec)
+        print_json(spec)
+        return 0
+
     if source == "validate":
         if args.out is None:
+            raise SystemExit("usage: video-compose validate <spec|demo|template:name>")
+        if args.extra is not None:
             raise SystemExit("usage: video-compose validate <spec|demo|template:name>")
         source = str(args.out)
         args.validate_only = True
         args.out = None
-    if source == "demo":
-        spec = demo_spec()
-    elif source.startswith("template:"):
-        spec = template_spec(source.split(":", 1)[1])
-    else:
-        spec = load_spec(Path(source))
+    if args.extra is not None:
+        raise SystemExit("too many arguments")
+    spec = source_spec(source)
     assert_valid_spec(spec)
     if args.validate_only:
         print("valid")

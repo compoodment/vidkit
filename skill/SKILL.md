@@ -18,6 +18,7 @@ Use this when computment asks to make or edit videos programmatically.
 
 1. Decide whether the task is:
    - a template render (`video-compose template:<name> out.mp4`)
+   - a starter from a built-in template (`video-compose init <name> spec.json`)
    - a custom JSON scene spec
    - an edit of existing media with `video-kit`
 2. Validate specs before rendering when editing JSON:
@@ -42,9 +43,12 @@ Use this when computment asks to make or edit videos programmatically.
 - `media-card`
 - `split-screen`
 
-Example:
+Examples:
 
 ```bash
+video-compose templates
+video-compose show template:media-card
+video-compose init media-card artifacts/video-compose/starter.json
 video-compose template:media-card artifacts/video-compose/media-card.mp4
 ```
 
@@ -56,7 +60,7 @@ Run all core templates:
 video-compose-verify
 ```
 
-It renders known templates to `artifacts/video-compose/verify/`, probes streams, and creates contact sheets for key templates.
+It renders known templates to `artifacts/video-compose/verify/`, probes streams, and creates contact sheets for key templates. Run `video-compose-selftest` after CLI/schema changes.
 
 ## Notes
 

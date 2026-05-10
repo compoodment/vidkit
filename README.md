@@ -14,9 +14,18 @@ No Python package dependencies are required.
 ## Quick start
 
 ```bash
+python3 tools/video-compose.py templates
 python3 tools/video-compose.py template:media-card out.mp4
-python3 tools/video-compose.py template:band-glitch glitch.mp4
+python3 tools/video-compose.py init media-card starter.json
 python3 tools/video-compose-verify.py
+```
+
+Optional local wrappers are included under `bin/`:
+
+```bash
+export PATH="$PWD/bin:$PATH"
+video-compose template:band-glitch glitch.mp4
+video-compose-selftest
 ```
 
 Core templates:
@@ -36,15 +45,18 @@ Render a JSON spec:
 python3 tools/video-compose.py examples/video-compose.lower-third-example.json out.mp4
 ```
 
-Validate without rendering:
+Discover/export/validate without rendering:
 
 ```bash
+python3 tools/video-compose.py templates
+python3 tools/video-compose.py show template:split-screen
+python3 tools/video-compose.py init split-screen starter.json
 python3 tools/video-compose.py --validate-only examples/video-compose.motion-polish-example.json
 # or
 python3 tools/video-compose.py validate template:split-screen
 ```
 
-Specs can define generated scenes, layered media, text/panels, keyframes, transitions, generated audio, and audio-bed mixing.
+Specs can define generated scenes, layered media, text/panels, keyframes, transitions, generated audio, and audio-bed mixing. `init` writes a starter JSON file and copies bundled sample assets beside it so the starter validates outside the repo checkout.
 
 ## Spec sketch
 
@@ -117,7 +129,7 @@ python3 tools/video-compose.py examples/video-compose.animation-presets-example.
 python3 tools/video-compose-verify.py
 ```
 
-The verifier validates and renders the six built-in templates, probes H.264/AAC streams with `ffprobe`, and creates contact sheets for selected templates. `tools/video-compose-selftest.py` adds focused behavioral checks for validation, opacity keyframes, and animation presets.
+The verifier validates and renders the six built-in templates, probes H.264/AAC streams with `ffprobe`, and creates contact sheets for selected templates. `tools/video-compose-selftest.py` adds focused behavioral checks for template listing/export, validation, opacity keyframes, and animation presets.
 
 ## OpenClaw skill
 
