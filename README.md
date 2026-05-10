@@ -135,6 +135,10 @@ The verifier validates and renders the six built-in templates, probes H.264/AAC 
 
 A draft AgentSkill is included at `skill/SKILL.md` for local OpenClaw usage.
 
+## Changelog
+
+See `CHANGELOG.md` for public project history and known limitations.
+
 ## Status
 
 Early and intentionally small. Built to stay dependency-light and assistant-friendly.
