@@ -27,6 +27,7 @@ Use this when computment asks to make or edit videos programmatically.
    - use `lower_third` for readable captions
    - use panels behind small text
    - use `radius` for rounded panels/media masks
+   - use `animate` presets for common entrances/exits before hand-authoring keyframes
    - keep glitch/effects off foreground text unless explicitly requested
 4. Render with `video-compose`.
 5. Verify with `ffprobe`, a contact sheet, and one representative frame when visual quality matters.
@@ -61,5 +62,5 @@ It renders known templates to `artifacts/video-compose/verify/`, probes streams,
 
 - This is a scripted motion-graphics/video assembly engine, not an interactive editor.
 - Keep the composer dependency-light: prefer Python stdlib + ffmpeg.
-- `x`, `y`, `opacity`, and media `scale` keyframes are supported.
+- `x`, `y`, `opacity`, and media `scale` keyframes are supported; `animate` offers preset fade/slide/pop entrances and exits.
 - Do not publish/upload to GitHub without explicit confirmation.

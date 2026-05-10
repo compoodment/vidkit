@@ -80,8 +80,17 @@ Media and panel layers support:
 - `border`, `border_color`, `border_opacity`
 - `start` / `end` timing
 - `keyframes`: `time`, `x`, `y`, `opacity`, `scale`, `ease`
+- `animate`: preset entrance/exit animation
 
 Supported easing values: `linear`, `in_quad`, `out_quad`, `in_out_quad`, `in_cubic`, `out_cubic`, `in_out_cubic` plus `ease_in`/`ease_out` aliases.
+
+Animation presets can be a string or object:
+
+```json
+{"animate": {"in": "pop", "out": "fade", "duration": 0.5}}
+```
+
+Supported presets: `fade`, `fade_in`, `fade_out`, `slide_left`, `slide_right`, `slide_up`, `slide_down`, `pop`, and `none`. `pop` uses scale, so it is media-only; slide/fade presets work on media and panel/lower-third layers.
 
 Transitions: `fade`, `wipeleft`, `wiperight`, `slideleft`, `slideright`, `circleopen`, `circleclose`.
 
@@ -93,6 +102,7 @@ Generated audio: `silence`, `tone`, `noise`, `pulse`. A top-level audio bed can 
 python3 tools/video-compose.py examples/video-compose.example.json example.mp4
 python3 tools/video-compose.py examples/video-compose.motion-example.json motion.mp4
 python3 tools/video-compose.py examples/video-compose.motion-polish-example.json polish.mp4
+python3 tools/video-compose.py examples/video-compose.animation-presets-example.json presets.mp4
 ```
 
 `examples/assets/sample.ppm` is bundled so the examples and templates work without private local media.
@@ -107,7 +117,7 @@ python3 tools/video-compose.py examples/video-compose.motion-polish-example.json
 python3 tools/video-compose-verify.py
 ```
 
-The verifier validates and renders the six built-in templates, probes H.264/AAC streams with `ffprobe`, and creates contact sheets for selected templates.
+The verifier validates and renders the six built-in templates, probes H.264/AAC streams with `ffprobe`, and creates contact sheets for selected templates. `tools/video-compose-selftest.py` adds focused behavioral checks for validation, opacity keyframes, and animation presets.
 
 ## OpenClaw skill
 

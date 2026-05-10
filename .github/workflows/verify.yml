@@ -19,6 +19,9 @@ jobs:
           python3 tools/video-compose.py --validate-only examples/video-compose.motion-example.json
           python3 tools/video-compose.py --validate-only examples/video-compose.lower-third-example.json
           python3 tools/video-compose.py --validate-only examples/video-compose.motion-polish-example.json
+          python3 tools/video-compose.py --validate-only examples/video-compose.animation-presets-example.json
+      - name: Run behavioral self-tests
+        run: python3 tools/video-compose-selftest.py
       - name: Render and probe templates
         run: python3 tools/video-compose-verify.py
       - name: Upload verification artifacts

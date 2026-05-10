@@ -27,6 +27,7 @@ FIT_TYPES = {"contain", "cover", "stretch"}
 CAMERA_TYPES = {"none", "zoom_in", "zoom_out", "pan", "shake"}
 TRANSITION_TYPES = {"fade", "wipeleft", "wiperight", "slideleft", "slideright", "circleopen", "circleclose", "none"}
 EASING_TYPES = {"linear", "none", "in_quad", "ease_in", "out_quad", "ease_out", "in_out_quad", "in_cubic", "out_cubic", "in_out_cubic"}
+ANIMATION_PRESETS = {"fade", "fade_in", "fade_out", "slide_left", "slide_right", "slide_up", "slide_down", "pop", "none"}
 
 
 def ffmpeg_bin(name: str | None = None) -> str:
@@ -330,6 +331,117 @@ def write_opacity_mask(path: Path, layer: dict[str, Any], *, width: int, height:
                 fh.write(bytes(len(base)))
             else:
                 fh.write(bytes(int(pixel * opacity) for pixel in base))
+
+
+def animation_config(layer: dict[str, Any]) -> dict[str, Any] | None:
+    animate = layer.get("animate")
+    if not animate:
+        return None
+    if isinstance(animate, str):
+        if animate in ("none", "off"):
+            return None
+        if animate == "fade_out":
+            return {"out": "fade"}
+        if animate == "fade_in":
+            return {"in": "fade"}
+        return {"in": animate}
+    if isinstance(animate, dict):
+        return animate
+    raise SystemExit("animate must be a string or object")
+
+
+def add_keyframe_value(frames: list[dict[str, Any]], time_value: float, prop: str, value: float, ease: str | None = None) -> None:
+    for frame in frames:
+        if abs(float(frame.get("time", -9999)) - time_value) < 0.000001:
+            frame[prop] = value
+            if ease:
+                frame.setdefault("ease", ease)
+            return
+    frame = {"time": time_value, prop: value}
+    if ease:
+        frame["ease"] = ease
+    frames.append(frame)
+
+
+def apply_animation_presets(layer: dict[str, Any], *, duration: float, w: int, h: int) -> dict[str, Any]:
+    config = animation_config(layer)
+    if not config:
+        return layer
+
+    out = dict(layer)
+    frames = [dict(frame) for frame in (layer.get("keyframes") or [])]
+    explicit_props = {key for frame in frames for key in frame if key in {"x", "y", "opacity", "scale"}}
+
+    box_w = int(layer.get("width", w))
+    box_h = int(layer.get("height", h))
+    base_x = float(layer.get("x", (w - box_w) / 2))
+    base_y = float(layer.get("y", (h - box_h) / 2))
+    base_opacity = float(layer.get("opacity", 1.0))
+    base_scale = float(layer.get("scale", 1.0))
+    in_duration = min(duration, max(0.0, float(config.get("duration", config.get("in_duration", 0.5)))))
+    out_duration = min(duration, max(0.0, float(config.get("out_duration", config.get("duration", 0.5)))))
+    distance = float(config.get("distance", 48))
+    in_ease = config.get("ease", config.get("in_ease", "out_cubic"))
+    out_ease = config.get("out_ease", "in_cubic")
+
+    def apply_in(preset: str) -> None:
+        if preset in ("none", "off") or in_duration <= 0:
+            return
+        if preset not in ANIMATION_PRESETS:
+            raise SystemExit(f"unsupported animation preset: {preset}")
+        if preset in {"fade", "fade_in", "slide_left", "slide_right", "slide_up", "slide_down", "pop"} and "opacity" not in explicit_props:
+            add_keyframe_value(frames, 0.0, "opacity", 0.0)
+            add_keyframe_value(frames, in_duration, "opacity", base_opacity, in_ease)
+        if preset == "slide_left" and "x" not in explicit_props:
+            add_keyframe_value(frames, 0.0, "x", base_x - distance)
+            add_keyframe_value(frames, in_duration, "x", base_x, in_ease)
+        elif preset == "slide_right" and "x" not in explicit_props:
+            add_keyframe_value(frames, 0.0, "x", base_x + distance)
+            add_keyframe_value(frames, in_duration, "x", base_x, in_ease)
+        elif preset == "slide_up" and "y" not in explicit_props:
+            add_keyframe_value(frames, 0.0, "y", base_y - distance)
+            add_keyframe_value(frames, in_duration, "y", base_y, in_ease)
+        elif preset == "slide_down" and "y" not in explicit_props:
+            add_keyframe_value(frames, 0.0, "y", base_y + distance)
+            add_keyframe_value(frames, in_duration, "y", base_y, in_ease)
+        elif preset == "pop" and "scale" not in explicit_props:
+            add_keyframe_value(frames, 0.0, "scale", base_scale * 0.85)
+            add_keyframe_value(frames, in_duration, "scale", base_scale, in_ease)
+
+    def apply_out(preset: str) -> None:
+        if preset in ("none", "off") or out_duration <= 0:
+            return
+        if preset not in ANIMATION_PRESETS:
+            raise SystemExit(f"unsupported animation preset: {preset}")
+        start = max(0.0, duration - out_duration)
+        if preset in {"fade", "fade_out", "slide_left", "slide_right", "slide_up", "slide_down", "pop"} and "opacity" not in explicit_props:
+            add_keyframe_value(frames, start, "opacity", base_opacity)
+            add_keyframe_value(frames, duration, "opacity", 0.0, out_ease)
+        if preset == "slide_left" and "x" not in explicit_props:
+            add_keyframe_value(frames, start, "x", base_x)
+            add_keyframe_value(frames, duration, "x", base_x - distance, out_ease)
+        elif preset == "slide_right" and "x" not in explicit_props:
+            add_keyframe_value(frames, start, "x", base_x)
+            add_keyframe_value(frames, duration, "x", base_x + distance, out_ease)
+        elif preset == "slide_up" and "y" not in explicit_props:
+            add_keyframe_value(frames, start, "y", base_y)
+            add_keyframe_value(frames, duration, "y", base_y - distance, out_ease)
+        elif preset == "slide_down" and "y" not in explicit_props:
+            add_keyframe_value(frames, start, "y", base_y)
+            add_keyframe_value(frames, duration, "y", base_y + distance, out_ease)
+        elif preset == "pop" and "scale" not in explicit_props:
+            add_keyframe_value(frames, start, "scale", base_scale)
+            add_keyframe_value(frames, duration, "scale", base_scale * 0.9, out_ease)
+
+    in_preset = config.get("in", config.get("type"))
+    if in_preset is None and not config.get("out"):
+        in_preset = "fade"
+    if in_preset is not None:
+        apply_in(str(in_preset))
+    if config.get("out"):
+        apply_out(str(config["out"]))
+    out["keyframes"] = sorted(frames, key=lambda frame: float(frame.get("time", 0)))
+    return out
 
 
 def scene_transition(scene: dict[str, Any], default: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -850,7 +962,9 @@ def render_layered_scene(scene: dict[str, Any], out: Path, *, w: int, h: int, fp
         raise SystemExit("layered scene needs at least one layer")
     background = scene.get("background", "black")
 
-    for layer in layers:
+    prepared_layers: list[dict[str, Any]] = []
+    for original in layers:
+        layer = dict(original)
         if layer.get("type") == "lower_third":
             layer.setdefault("x", 52)
             layer.setdefault("y", h - 132)
@@ -861,6 +975,8 @@ def render_layered_scene(scene: dict[str, Any], out: Path, *, w: int, h: int, fp
             layer.setdefault("border", 2)
             layer.setdefault("border_color", "#00d8ff")
             layer.setdefault("radius", 14)
+        prepared_layers.append(apply_animation_presets(layer, duration=duration, w=w, h=h))
+    layers = prepared_layers
 
     with tempfile.TemporaryDirectory(prefix="video-compose-layered-") as tmp:
         tmpdir = Path(tmp)
@@ -1569,6 +1685,43 @@ def validate_keyframes(errors: list[str], path: str, owner: dict[str, Any], dura
         errors.append(f"{path}.keyframes must be in increasing time order")
 
 
+def validate_animation(errors: list[str], path: str, layer: dict[str, Any], *, layer_type: str, allowed_props: set[str]) -> None:
+    animate = layer.get("animate")
+    if not animate:
+        return
+    if layer_type not in {"media", "panel", "lower_third"}:
+        errors.append(f"{path}.animate is not supported for {layer_type} layers")
+        return
+    if isinstance(animate, str):
+        if animate not in ANIMATION_PRESETS and animate != "off":
+            errors.append(f"{path}.animate unsupported preset: {animate}")
+        if animate == "pop" and layer_type != "media":
+            errors.append(f"{path}.animate pop uses scale and is only supported for media layers")
+        return
+    if not isinstance(animate, dict):
+        errors.append(f"{path}.animate must be a string or object")
+        return
+    known = {"type", "in", "out", "duration", "in_duration", "out_duration", "distance", "ease", "in_ease", "out_ease"}
+    for key in animate:
+        if key not in known:
+            errors.append(f"{path}.animate.{key} unsupported animation option")
+    for key in ("type", "in", "out"):
+        if key in animate and animate[key] not in ANIMATION_PRESETS and animate[key] != "off":
+            errors.append(f"{path}.animate.{key} unsupported preset: {animate[key]}")
+    if animate.get("in") == "fade_out" or animate.get("type") == "fade_out":
+        errors.append(f"{path}.animate.in cannot use fade_out; use fade/fade_in for entrance or set animate.out")
+    if animate.get("out") == "fade_in":
+        errors.append(f"{path}.animate.out cannot use fade_in; use fade/fade_out for exit")
+    for key in ("duration", "in_duration", "out_duration", "distance"):
+        if key in animate:
+            validate_positive_number(errors, f"{path}.animate.{key}", animate[key], allow_zero=(key != "distance"))
+    for key in ("ease", "in_ease", "out_ease"):
+        if key in animate and animate[key] not in EASING_TYPES:
+            errors.append(f"{path}.animate.{key} unsupported easing: {animate[key]}")
+    if layer_type != "media" and any(preset in {"pop"} for preset in (animate.get("type"), animate.get("in"), animate.get("out"))):
+        errors.append(f"{path}.animate pop uses scale and is only supported for media layers")
+
+
 def validate_layer(errors: list[str], path: str, layer: Any, *, scene_duration_value: float) -> None:
     if not isinstance(layer, dict):
         errors.append(f"{path} must be an object")
@@ -1619,10 +1772,11 @@ def validate_layer(errors: list[str], path: str, layer: Any, *, scene_duration_v
     validate_color(errors, f"{path}.border_color", layer.get("border_color"))
     if layer_type == "media":
         allowed_keyframe_props = {"x", "y", "opacity", "scale"}
-    elif layer_type == "panel":
+    elif layer_type in {"panel", "lower_third"}:
         allowed_keyframe_props = {"x", "y", "opacity"}
     else:
         allowed_keyframe_props = set()
+    validate_animation(errors, path, layer, layer_type=layer_type, allowed_props=allowed_keyframe_props)
     if layer.get("keyframes") and not allowed_keyframe_props:
         errors.append(f"{path}.keyframes are not supported for {layer_type} layers; use media/panel layers for animated properties")
     else:

@@ -1,0 +1,68 @@
+{
+  "size": "640x360",
+  "fps": 24,
+  "scenes": [
+    {
+      "type": "layered",
+      "duration": 4.2,
+      "background": "#050510",
+      "audio": {
+        "type": "pulse",
+        "frequency": 440,
+        "volume": 0.025,
+        "period": 0.32,
+        "duty": 0.05
+      },
+      "layers": [
+        {
+          "type": "media",
+          "source": "examples/assets/sample.ppm",
+          "source_type": "image",
+          "fit": "cover",
+          "width": 430,
+          "height": 242,
+          "x": 105,
+          "y": 42,
+          "radius": 26,
+          "border": 3,
+          "border_color": "#00d8ff",
+          "opacity": 0.94,
+          "animate": {
+            "in": "pop",
+            "out": "fade",
+            "duration": 1.15,
+            "out_duration": 0.9
+          }
+        },
+        {
+          "type": "panel",
+          "x": 58,
+          "y": 274,
+          "width": 524,
+          "height": 54,
+          "radius": 18,
+          "panel_color": "#000000",
+          "opacity": 0.84,
+          "border": 2,
+          "border_color": "#ff4fd8",
+          "animate": {
+            "in": "slide_down",
+            "out": "slide_down",
+            "duration": 1.05,
+            "out_duration": 0.9,
+            "distance": 72
+          }
+        },
+        {
+          "type": "text",
+          "text": "Animation presets: pop, fade, slide_down",
+          "x": 78,
+          "y": 288,
+          "align": 7,
+          "size": 27,
+          "color": "white"
+        }
+      ]
+    }
+  ]
+}
