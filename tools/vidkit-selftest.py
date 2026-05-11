@@ -149,6 +149,32 @@ def main() -> int:
         if not (animate_start < 5 and animate_mid > 20):
             raise SystemExit(f"animation preset selftest failed: start={animate_start:.2f} mid={animate_mid:.2f}")
 
+        shapes_spec = {
+            "size": "180x120",
+            "fps": 10,
+            "scenes": [
+                {
+                    "type": "layered",
+                    "duration": 1.0,
+                    "background": "#08111f",
+                    "audio": {"type": "silence"},
+                    "layers": [
+                        {"type": "shape", "shape": "progress_bar", "x": 12, "y": 16, "width": 110, "height": 14, "value": 0.6, "fill": "#22c55e"},
+                        {"type": "shape", "shape": "checkbox", "x": 136, "y": 10, "size": 24, "checked": True, "color": "#22c55e"},
+                        {"type": "preset", "preset": "warning_banner", "x": 12, "y": 72, "width": 156, "height": 32, "text": "shape preset"},
+                    ],
+                }
+            ],
+        }
+        shapes_path = tmpdir / "shapes.json"
+        shapes_video = tmpdir / "shapes.mp4"
+        write_json(shapes_path, shapes_spec)
+        run([wrapper_path("vidkit"), "--validate-only", str(shapes_path)])
+        run([wrapper_path("vidkit"), str(shapes_path), str(shapes_video)])
+        shapes_avg = average_frame(shapes_video, 0.5)
+        if shapes_avg < 20:
+            raise SystemExit(f"shape/preset render selftest failed: avg={shapes_avg:.2f}")
+
         invalid_text = {
             "size": "160x90",
             "scenes": [{"type": "layered", "duration": 1, "layers": [{"type": "text", "text": "bad", "keyframes": [{"time": 0, "opacity": 0}]}]}],
@@ -178,6 +204,26 @@ def main() -> int:
         failed = run([wrapper_path("vidkit"), "--validate-only", str(invalid_panel_pop_path)], check=False)
         if failed.returncode == 0 or "media layers" not in (failed.stdout + failed.stderr):
             raise SystemExit("invalid panel pop selftest failed")
+
+        invalid_shape = {
+            "size": "160x90",
+            "scenes": [{"type": "layered", "duration": 1, "layers": [{"type": "shape", "shape": "spinner"}]}],
+        }
+        invalid_shape_path = tmpdir / "invalid-shape.json"
+        write_json(invalid_shape_path, invalid_shape)
+        failed = run([wrapper_path("vidkit"), "--validate-only", str(invalid_shape_path)], check=False)
+        if failed.returncode == 0 or "unsupported shape" not in (failed.stdout + failed.stderr):
+            raise SystemExit("invalid shape selftest failed")
+
+        invalid_preset = {
+            "size": "160x90",
+            "scenes": [{"type": "layered", "duration": 1, "layers": [{"type": "preset", "preset": "warning_banner"}]}],
+        }
+        invalid_preset_path = tmpdir / "invalid-preset.json"
+        write_json(invalid_preset_path, invalid_preset)
+        failed = run([wrapper_path("vidkit"), "--validate-only", str(invalid_preset_path)], check=False)
+        if failed.returncode == 0 or "text is required" not in (failed.stdout + failed.stderr):
+            raise SystemExit("invalid preset selftest failed")
 
     print("selftest passed")
     return 0

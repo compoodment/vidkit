@@ -1,0 +1,120 @@
+{
+  "size": "640x360",
+  "fps": 24,
+  "scenes": [
+    {
+      "type": "layered",
+      "duration": 4.0,
+      "background": "#08111f",
+      "audio": {"type": "pulse", "frequency": 360, "volume": 0.025, "period": 0.42, "duty": 0.06},
+      "layers": [
+        {
+          "type": "shape",
+          "shape": "window",
+          "x": 34,
+          "y": 30,
+          "width": 330,
+          "height": 210,
+          "fill": "#f8fafc",
+          "border_color": "#38bdf8",
+          "title": "build.log"
+        },
+        {
+          "type": "preset",
+          "preset": "terminal_prompt",
+          "x": 54,
+          "y": 62,
+          "width": 290,
+          "height": 104,
+          "text": "vidkit render ui.json",
+          "start": 0.25,
+          "end": 3.8
+        },
+        {
+          "type": "shape",
+          "shape": "progress_bar",
+          "x": 68,
+          "y": 188,
+          "width": 250,
+          "height": 22,
+          "value": 0.72,
+          "fill": "#22c55e",
+          "background": "#dbeafe",
+          "border_color": "#2563eb"
+        },
+        {
+          "type": "shape",
+          "shape": "checkbox",
+          "x": 402,
+          "y": 48,
+          "size": 30,
+          "checked": true,
+          "color": "#16a34a",
+          "border_color": "#16a34a"
+        },
+        {
+          "type": "preset",
+          "preset": "form_field",
+          "x": 444,
+          "y": 44,
+          "width": 150,
+          "height": 34,
+          "label": "Status",
+          "value": "Ready"
+        },
+        {
+          "type": "shape",
+          "shape": "speech_bubble",
+          "x": 392,
+          "y": 118,
+          "width": 200,
+          "height": 78,
+          "fill": "#ffffff",
+          "text": "Shapes compose into scenes.",
+          "wrap": 18,
+          "size": 18
+        },
+        {
+          "type": "preset",
+          "preset": "warning_banner",
+          "x": 38,
+          "y": 272,
+          "width": 564,
+          "height": 48,
+          "text": "JSON primitives: shapes + presets",
+          "fill": "#facc15"
+        },
+        {
+          "type": "shape",
+          "shape": "arrow",
+          "x": 330,
+          "y": 244,
+          "width": 68,
+          "height": 24,
+          "color": "#facc15"
+        },
+        {
+          "type": "shape",
+          "shape": "cursor",
+          "x": 582,
+          "y": 214,
+          "width": 28,
+          "height": 38,
+          "color": "#ffffff",
+          "outline": "#111827"
+        },
+        {
+          "type": "preset",
+          "preset": "stamp",
+          "x": 392,
+          "y": 214,
+          "width": 154,
+          "height": 46,
+          "text": "shipped",
+          "color": "#ef4444",
+          "fill_opacity": 0.12
+        }
+      ]
+    }
+  ]
+}

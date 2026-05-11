@@ -87,6 +87,8 @@ Layer types in a `layered` scene:
 - `panel`: colored rectangle layer, useful for title cards and UI shapes
 - `lower_third`: panel preset plus text event defaults
 - `text`: subtitle/label event rendered through ASS subtitles
+- `shape`: reusable primitives expanded into panel/text layers
+- `preset`: reusable text/dialog/stamp treatments expanded into panel/text/shape layers
 
 Media and panel layers support:
 
@@ -108,6 +110,10 @@ Animation presets can be a string or object:
 
 Supported presets: `fade`, `fade_in`, `fade_out`, `slide_left`, `slide_right`, `slide_up`, `slide_down`, `pop`, and `none`. `pop` uses scale, so it is media-only; slide/fade presets work on media and panel/lower-third layers.
 
+Shape layers use `"type": "shape"` with a `"shape"` name. First-pass shapes are `progress_bar`, `checkbox`, `arrow`, `cursor`, `speech_bubble`, `file_icon`, and `window`. Common fields include `x`, `y`, `width`, `height`, `start`, `end`, `opacity`, `color`, `fill`, `background`, `border_color`, and `radius`; shape-specific fields include `value` for `progress_bar`, `checked` for `checkbox`, `direction` for `arrow`, and `text` for `speech_bubble`.
+
+Preset layers use `"type": "preset"` with a `"preset"` name. First-pass presets are `error_dialog`, `stamp`, `meme_caption`, `file_label`, `terminal_prompt`, `form_field`, and `warning_banner`. Presets are validated by name and require obvious text fields, then expand into existing shape/panel/text layers before render.
+
 Transitions: `fade`, `wipeleft`, `wiperight`, `slideleft`, `slideright`, `circleopen`, `circleclose`.
 
 Generated audio: `silence`, `tone`, `noise`, `pulse`. A top-level audio bed can mix generated or source audio under the rendered scenes.
@@ -119,6 +125,7 @@ python3 tools/vidkit-compose.py examples/vidkit.example.json example.mp4
 python3 tools/vidkit-compose.py examples/vidkit.motion-example.json motion.mp4
 python3 tools/vidkit-compose.py examples/vidkit.motion-polish-example.json polish.mp4
 python3 tools/vidkit-compose.py examples/vidkit.animation-presets-example.json presets.mp4
+python3 tools/vidkit-compose.py examples/vidkit.shapes-presets-example.json shapes-presets.mp4
 ```
 
 `examples/assets/sample.ppm` is bundled so the examples and templates work without private local media.

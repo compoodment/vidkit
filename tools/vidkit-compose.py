@@ -21,7 +21,9 @@ from typing import Any
 
 
 SCENE_TYPES = {"card", "bars", "particles", "wave", "grid", "orbits", "typewriter", "image", "media", "layered"}
-LAYER_TYPES = {"media", "panel", "text", "lower_third"}
+LAYER_TYPES = {"media", "panel", "text", "lower_third", "shape", "preset"}
+SHAPE_NAMES = {"progress_bar", "checkbox", "arrow", "cursor", "speech_bubble", "file_icon", "window"}
+PRESET_NAMES = {"error_dialog", "stamp", "meme_caption", "file_label", "terminal_prompt", "form_field", "warning_banner"}
 AUDIO_TYPES = {"none", "silence", "tone", "noise", "pulse"}
 FIT_TYPES = {"contain", "cover", "stretch"}
 CAMERA_TYPES = {"none", "zoom_in", "zoom_out", "pan", "shake"}
@@ -109,9 +111,19 @@ def ass_color(value: str) -> str:
     }
     if value.lower() in names:
         return names[value.lower()]
+    if value.startswith("#") and len(value) == 7:
+        r = int(value[1:3], 16)
+        g = int(value[3:5], 16)
+        b = int(value[5:7], 16)
+        return f"&H{b:02X}{g:02X}{r:02X}&"
     if value.startswith("&H") and not value.endswith("&"):
         return value + "&"
     return value
+
+
+def ass_alpha(opacity: Any) -> str:
+    value = max(0.0, min(1.0, float(opacity)))
+    return f"&H{int(round((1.0 - value) * 255)):02X}&"
 
 
 def esc_filter_path(path: Path) -> str:
@@ -445,6 +457,253 @@ def apply_animation_presets(layer: dict[str, Any], *, duration: float, w: int, h
     return out
 
 
+def layer_start_end(layer: dict[str, Any], duration: float) -> tuple[float, float]:
+    return float(layer.get("start", 0)), float(layer.get("end", duration))
+
+
+def offset_keyframes(layer: dict[str, Any], dx: float, dy: float) -> list[dict[str, Any]]:
+    frames = []
+    for keyframe in layer.get("keyframes") or []:
+        frame = dict(keyframe)
+        if "x" in frame:
+            frame["x"] = float(frame["x"]) + dx
+        if "y" in frame:
+            frame["y"] = float(frame["y"]) + dy
+        frames.append(frame)
+    return frames
+
+
+def expanded_common(layer: dict[str, Any], *, x: float, y: float, duration: float) -> dict[str, Any]:
+    start, end = layer_start_end(layer, duration)
+    out: dict[str, Any] = {"x": x, "y": y, "start": start, "end": end}
+    if "opacity" in layer:
+        out["opacity"] = layer["opacity"]
+    if layer.get("animate"):
+        out["animate"] = layer["animate"]
+    if layer.get("keyframes"):
+        out["keyframes"] = offset_keyframes(layer, x - float(layer.get("x", 0)), y - float(layer.get("y", 0)))
+    return out
+
+
+def panel_part(layer: dict[str, Any], *, duration: float, x: float, y: float, width: int, height: int, color: str, radius: int = 0, opacity: float | None = None, border: int = 0, border_color: str | None = None) -> dict[str, Any]:
+    out = {
+        "type": "panel",
+        "width": max(1, int(width)),
+        "height": max(1, int(height)),
+        "panel_color": color,
+        "radius": max(0, int(radius)),
+        **expanded_common(layer, x=x, y=y, duration=duration),
+    }
+    if opacity is not None:
+        out["opacity"] = opacity
+    if border > 0:
+        out["border"] = border
+        out["border_color"] = border_color or layer.get("border_color", "white")
+    return out
+
+
+def text_part(layer: dict[str, Any], *, duration: float, text: str, x: float, y: float, size: int, color: str = "white", align: int = 5, wrap: int | None = None) -> dict[str, Any]:
+    start, end = layer_start_end(layer, duration)
+    out: dict[str, Any] = {
+        "type": "text",
+        "text": text,
+        "x": int(x),
+        "y": int(y),
+        "size": int(size),
+        "color": color,
+        "align": align,
+        "start": start,
+        "end": end,
+    }
+    if "opacity" in layer:
+        out["opacity"] = layer["opacity"]
+    if wrap:
+        out["wrap"] = wrap
+    return out
+
+
+def expand_shape_layer(layer: dict[str, Any], *, duration: float, scene_w: int, scene_h: int) -> list[dict[str, Any]]:
+    shape = layer.get("shape") or layer.get("name")
+    x = float(layer.get("x", 0))
+    y = float(layer.get("y", 0))
+    color = layer.get("color", layer.get("panel_color", "#00d8ff"))
+    fill = layer.get("fill", color)
+    background = layer.get("background", "#111827")
+    border_color = layer.get("border_color", color)
+    radius = int(layer.get("radius", 8))
+
+    if shape == "progress_bar":
+        width = int(layer.get("width", 220))
+        height = int(layer.get("height", 18))
+        value = max(0.0, min(1.0, float(layer.get("value", layer.get("progress", 0.5)))))
+        pad = int(layer.get("pad", max(2, min(6, height // 5))))
+        fill_width = max(1, int((width - pad * 2) * value))
+        return [
+            panel_part(layer, duration=duration, x=x, y=y, width=width, height=height, color=background, radius=radius, border=int(layer.get("border", 1)), border_color=border_color),
+            panel_part(layer, duration=duration, x=x + pad, y=y + pad, width=fill_width, height=max(1, height - pad * 2), color=fill, radius=max(0, radius - pad)),
+        ]
+
+    if shape == "checkbox":
+        size = int(layer.get("size", layer.get("width", layer.get("height", 28))))
+        checked = bool(layer.get("checked", True))
+        parts = [panel_part(layer, duration=duration, x=x, y=y, width=size, height=size, color=layer.get("background", "#0b1020"), radius=radius, border=int(layer.get("border", 2)), border_color=border_color)]
+        if checked:
+            parts.append(text_part(layer, duration=duration, text="X", x=x + size / 2, y=y + size / 2 - 2, size=max(14, int(size * 0.72)), color=color))
+        return parts
+
+    if shape == "arrow":
+        width = int(layer.get("width", 120))
+        height = int(layer.get("height", 28))
+        thickness = int(layer.get("thickness", max(4, height // 5)))
+        direction = layer.get("direction", "right")
+        parts: list[dict[str, Any]] = []
+        if direction in {"left", "right"}:
+            shaft_w = max(1, width - height)
+            shaft_x = x + (height if direction == "left" else 0)
+            parts.append(panel_part(layer, duration=duration, x=shaft_x, y=y + (height - thickness) / 2, width=shaft_w, height=thickness, color=color, radius=thickness // 2))
+            head = "<" if direction == "left" else ">"
+            head_x = x + height / 2 if direction == "left" else x + width - height / 2
+            parts.append(text_part(layer, duration=duration, text=head, x=head_x, y=y + height / 2 - 1, size=max(18, int(height * 1.25)), color=color))
+        else:
+            shaft_h = max(1, height - width)
+            shaft_y = y + (width if direction == "up" else 0)
+            parts.append(panel_part(layer, duration=duration, x=x + (width - thickness) / 2, y=shaft_y, width=thickness, height=shaft_h, color=color, radius=thickness // 2))
+            head = "^" if direction == "up" else "v"
+            head_y = y + width / 2 if direction == "up" else y + height - width / 2
+            parts.append(text_part(layer, duration=duration, text=head, x=x + width / 2, y=head_y - 1, size=max(18, int(width * 1.15)), color=color))
+        return parts
+
+    if shape == "cursor":
+        width = int(layer.get("width", 34))
+        height = int(layer.get("height", 44))
+        thickness = max(3, int(layer.get("thickness", width // 5)))
+        return [
+            panel_part(layer, duration=duration, x=x, y=y, width=thickness, height=height, color=color, radius=1, border=int(layer.get("border", 1)), border_color=layer.get("outline", "#000000")),
+            panel_part(layer, duration=duration, x=x, y=y, width=width, height=thickness, color=color, radius=1),
+            panel_part(layer, duration=duration, x=x + thickness, y=y + height - thickness, width=max(1, width - thickness), height=thickness, color=color, radius=1),
+        ]
+
+    if shape == "speech_bubble":
+        width = int(layer.get("width", 240))
+        height = int(layer.get("height", 96))
+        tail = int(layer.get("tail", 18))
+        parts = [panel_part(layer, duration=duration, x=x, y=y, width=width, height=height, color=fill, radius=radius, border=int(layer.get("border", 0)), border_color=border_color)]
+        parts.append(panel_part(layer, duration=duration, x=x + int(width * 0.16), y=y + height - 1, width=tail, height=max(8, tail // 2), color=fill, radius=2))
+        if layer.get("text"):
+            parts.append(text_part(layer, duration=duration, text=wrap_text(layer.get("text", ""), layer.get("wrap", max(10, width // 12))), x=x + 18, y=y + 18, size=int(layer.get("size", 22)), color=layer.get("text_color", "#000000"), align=7))
+        return parts
+
+    if shape == "file_icon":
+        width = int(layer.get("width", 84))
+        height = int(layer.get("height", 108))
+        fold = int(layer.get("fold", min(width, height) * 0.22))
+        parts = [
+            panel_part(layer, duration=duration, x=x, y=y, width=width, height=height, color=fill, radius=radius, border=int(layer.get("border", 2)), border_color=border_color),
+            panel_part(layer, duration=duration, x=x + width - fold, y=y, width=fold, height=fold, color=layer.get("fold_color", "#d1d5db"), radius=1),
+        ]
+        if layer.get("label"):
+            parts.append(text_part(layer, duration=duration, text=str(layer["label"]), x=x + width / 2, y=y + height * 0.62, size=int(layer.get("size", 18)), color=layer.get("text_color", "#111827")))
+        return parts
+
+    if shape == "window":
+        width = int(layer.get("width", 320))
+        height = int(layer.get("height", 190))
+        chrome = int(layer.get("chrome", 30))
+        parts = [
+            panel_part(layer, duration=duration, x=x, y=y, width=width, height=height, color=fill, radius=radius, border=int(layer.get("border", 2)), border_color=border_color),
+            panel_part(layer, duration=duration, x=x, y=y, width=width, height=chrome, color=layer.get("chrome_color", "#111827"), radius=radius),
+        ]
+        dot = max(4, chrome // 6)
+        for idx, dot_color in enumerate(layer.get("dots", ["#ff5f57", "#febc2e", "#28c840"])):
+            parts.append(panel_part(layer, duration=duration, x=x + 12 + idx * (dot * 3), y=y + (chrome - dot) / 2, width=dot, height=dot, color=dot_color, radius=dot))
+        if layer.get("title"):
+            parts.append(text_part(layer, duration=duration, text=str(layer["title"]), x=x + 48, y=y + chrome / 2 - 2, size=int(layer.get("title_size", 16)), color=layer.get("title_color", "white"), align=4))
+        return parts
+
+    raise SystemExit(f"unsupported shape: {shape}")
+
+
+def expand_preset_layer(layer: dict[str, Any], *, duration: float, scene_w: int, scene_h: int) -> list[dict[str, Any]]:
+    preset = layer.get("preset") or layer.get("name")
+    x = float(layer.get("x", 0))
+    y = float(layer.get("y", 0))
+    width = int(layer.get("width", min(520, scene_w - int(x) - 24)))
+    height = int(layer.get("height", 96))
+    text = str(layer.get("text", layer.get("message", "")))
+
+    if preset == "error_dialog":
+        title = layer.get("title", "Error")
+        button = layer.get("button", "OK")
+        return [
+            *expand_shape_layer({**layer, "type": "shape", "shape": "window", "width": width, "height": int(layer.get("height", 190)), "fill": layer.get("fill", "#f8fafc"), "border_color": layer.get("border_color", "#ef4444"), "chrome_color": "#991b1b", "title": title}, duration=duration, scene_w=scene_w, scene_h=scene_h),
+            text_part(layer, duration=duration, text=wrap_text(text, layer.get("wrap", 34)), x=x + 28, y=y + 64, size=int(layer.get("size", 24)), color=layer.get("text_color", "#111827"), align=7),
+            panel_part(layer, duration=duration, x=x + width - 92, y=y + int(layer.get("height", 190)) - 46, width=64, height=28, color=layer.get("button_color", "#2563eb"), radius=6),
+            text_part(layer, duration=duration, text=str(button), x=x + width - 60, y=y + int(layer.get("height", 190)) - 32, size=16, color="white"),
+        ]
+
+    if preset == "stamp":
+        stamp_text = str(layer.get("text", "APPROVED")).upper()
+        return [
+            panel_part(layer, duration=duration, x=x, y=y, width=width, height=height, color=layer.get("fill", "#000000"), radius=int(layer.get("radius", 6)), opacity=float(layer.get("fill_opacity", 0.0)), border=int(layer.get("border", 4)), border_color=layer.get("color", "#ef4444")),
+            text_part(layer, duration=duration, text=stamp_text, x=x + width / 2, y=y + height / 2 - 2, size=int(layer.get("size", min(44, height * 0.48))), color=layer.get("color", "#ef4444")),
+        ]
+
+    if preset == "meme_caption":
+        top = layer.get("top")
+        bottom = layer.get("bottom", text)
+        parts = []
+        if top:
+            parts.append(text_part(layer, duration=duration, text=str(top).upper(), x=x + width / 2, y=y, size=int(layer.get("size", 40)), color=layer.get("color", "white"), wrap=layer.get("wrap", max(14, width // 18))))
+        if bottom:
+            parts.append(text_part(layer, duration=duration, text=str(bottom).upper(), x=x + width / 2, y=y + height, size=int(layer.get("size", 40)), color=layer.get("color", "white"), wrap=layer.get("wrap", max(14, width // 18))))
+        return parts
+
+    if preset == "file_label":
+        icon_w = int(layer.get("icon_width", 72))
+        return [
+            *expand_shape_layer({**layer, "type": "shape", "shape": "file_icon", "width": icon_w, "height": int(layer.get("icon_height", 88)), "label": layer.get("extension", "TXT")}, duration=duration, scene_w=scene_w, scene_h=scene_h),
+            text_part(layer, duration=duration, text=text, x=x + icon_w + 14, y=y + 28, size=int(layer.get("size", 22)), color=layer.get("text_color", "white"), align=7, wrap=layer.get("wrap", 22)),
+        ]
+
+    if preset == "terminal_prompt":
+        prompt = layer.get("prompt", "$")
+        return [
+            *expand_shape_layer({**layer, "type": "shape", "shape": "window", "width": width, "height": height, "fill": layer.get("fill", "#020617"), "chrome_color": "#111827", "title": layer.get("title", "terminal")}, duration=duration, scene_w=scene_w, scene_h=scene_h),
+            text_part(layer, duration=duration, text=f"{prompt} {text}", x=x + 18, y=y + 48, size=int(layer.get("size", 22)), color=layer.get("text_color", "#22c55e"), align=7, wrap=layer.get("wrap", max(16, width // 12))),
+        ]
+
+    if preset == "form_field":
+        label = str(layer.get("label", "Field"))
+        value = str(layer.get("value", text))
+        field_y = y + int(layer.get("label_gap", 28))
+        return [
+            text_part(layer, duration=duration, text=label, x=x, y=y, size=int(layer.get("label_size", 18)), color=layer.get("label_color", "#cbd5e1"), align=7),
+            panel_part(layer, duration=duration, x=x, y=field_y, width=width, height=height, color=layer.get("fill", "#ffffff"), radius=int(layer.get("radius", 8)), border=int(layer.get("border", 2)), border_color=layer.get("border_color", "#94a3b8")),
+            text_part(layer, duration=duration, text=value, x=x + 14, y=field_y + height / 2 - 2, size=int(layer.get("size", 22)), color=layer.get("text_color", "#111827"), align=4),
+        ]
+
+    if preset == "warning_banner":
+        return [
+            panel_part(layer, duration=duration, x=x, y=y, width=width, height=height, color=layer.get("fill", "#f59e0b"), radius=int(layer.get("radius", 10)), border=int(layer.get("border", 0)), border_color=layer.get("border_color", "#92400e")),
+            text_part(layer, duration=duration, text=wrap_text(text, layer.get("wrap", max(20, width // 14))), x=x + 22, y=y + height / 2 - 2, size=int(layer.get("size", 24)), color=layer.get("text_color", "#111827"), align=4),
+        ]
+
+    raise SystemExit(f"unsupported preset: {preset}")
+
+
+def expand_layers(layers: list[dict[str, Any]], *, duration: float, scene_w: int, scene_h: int) -> list[dict[str, Any]]:
+    expanded: list[dict[str, Any]] = []
+    for layer in layers:
+        layer_type = layer.get("type") or ("media" if layer.get("source") else "panel")
+        if layer_type == "shape":
+            expanded.extend(expand_shape_layer(layer, duration=duration, scene_w=scene_w, scene_h=scene_h))
+        elif layer_type == "preset":
+            expanded.extend(expand_preset_layer(layer, duration=duration, scene_w=scene_w, scene_h=scene_h))
+        else:
+            expanded.append(layer)
+    return expanded
+
+
 def scene_transition(scene: dict[str, Any], default: dict[str, Any] | None) -> dict[str, Any] | None:
     transition = scene.get("transition", default)
     if not transition:
@@ -484,9 +743,15 @@ def write_ass(width: int, height: int, duration: float, events: list[dict[str, A
         x = int(event.get("x", width // 2))
         y = int(event.get("y", height // 2))
         size = int(event.get("size", 48))
-        color = ass_color(event.get("color", "&H00FFFFFF&"))
+        raw_color = str(event.get("color", "&H00FFFFFF&"))
+        color = ass_color(raw_color)
         align = int(event.get("align", 5))
-        override = rf"{{\an{align}\fs{size}\1c{color}\3c&H000000&\bord2\shad1\pos({x},{y})}}"
+        alpha = ass_alpha(event.get("opacity", 1.0))
+        dark_text = raw_color.lower() in {"black", "#000000", "#111827", "#020617"}
+        outline = float(event.get("outline", 0 if dark_text else 1))
+        shadow = float(event.get("shadow", 0))
+        outline_color = ass_color(event.get("outline_color", "white" if dark_text else "black"))
+        override = rf"{{\an{align}\fs{size}\1c{color}\alpha{alpha}\3c{outline_color}\bord{outline:g}\shad{shadow:g}\pos({x},{y})}}"
         lines.append(f"Dialogue: 0,{ass_time(start)},{ass_time(end)},Default,,0,0,0,,{override}{text}")
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -709,7 +974,7 @@ def scene_events(scene: dict[str, Any], w: int, h: int, duration: float) -> list
             events.append({"text": title, "x": w // 2, "y": int(h * 0.10), "size": scene.get("title_size", 38), "color": "&H00FFFFFF"})
         if subtitle:
             events.append({"text": subtitle, "x": w // 2, "y": int(h * 0.91), "size": scene.get("subtitle_size", 24), "color": "&H00D8FF00"})
-        for layer in scene.get("layers") or []:
+        for layer in expand_layers(scene.get("layers") or [], duration=duration, scene_w=w, scene_h=h):
             if layer.get("type") == "text":
                 events.append(
                     {
@@ -958,7 +1223,7 @@ def render_scene(scene: dict[str, Any], out: Path, *, w: int, h: int, fps: int, 
 
 def render_layered_scene(scene: dict[str, Any], out: Path, *, w: int, h: int, fps: int, ffmpeg: str) -> None:
     duration = scene_duration(scene)
-    layers = scene.get("layers") or []
+    layers = expand_layers(scene.get("layers") or [], duration=duration, scene_w=w, scene_h=h)
     if not layers:
         raise SystemExit("layered scene needs at least one layer")
     background = scene.get("background", "black")
@@ -1781,6 +2046,52 @@ def validate_animation(errors: list[str], path: str, layer: dict[str, Any], *, l
         errors.append(f"{path}.animate pop uses scale and is only supported for media layers")
 
 
+def validate_shape_layer(errors: list[str], path: str, layer: dict[str, Any]) -> None:
+    shape = layer.get("shape") or layer.get("name")
+    if not shape:
+        errors.append(f"{path}.shape is required for shape layers")
+        return
+    if shape not in SHAPE_NAMES:
+        errors.append(f"{path}.shape unsupported shape: {shape}")
+        return
+    if shape == "progress_bar":
+        value = layer.get("value", layer.get("progress", 0.5))
+        try:
+            value_number = float(value)
+            if not 0 <= value_number <= 1:
+                errors.append(f"{path}.value should be between 0 and 1")
+        except (TypeError, ValueError):
+            errors.append(f"{path}.value must be a number")
+    if shape == "checkbox" and "checked" in layer and not isinstance(layer["checked"], bool):
+        errors.append(f"{path}.checked must be a boolean")
+    if shape == "arrow":
+        direction = layer.get("direction", "right")
+        if direction not in {"left", "right", "up", "down"}:
+            errors.append(f"{path}.direction unsupported arrow direction: {direction}")
+    if shape in {"speech_bubble", "file_icon", "window"}:
+        for field in ("fill", "background", "text_color", "title_color", "chrome_color", "fold_color"):
+            validate_color(errors, f"{path}.{field}", layer.get(field))
+
+
+def validate_preset_layer(errors: list[str], path: str, layer: dict[str, Any]) -> None:
+    preset = layer.get("preset") or layer.get("name")
+    if not preset:
+        errors.append(f"{path}.preset is required for preset layers")
+        return
+    if preset not in PRESET_NAMES:
+        errors.append(f"{path}.preset unsupported preset: {preset}")
+        return
+    needs_text = {"error_dialog", "stamp", "file_label", "terminal_prompt", "warning_banner"}
+    if preset in needs_text and not (layer.get("text") or layer.get("message")):
+        errors.append(f"{path}.text is required for {preset} presets")
+    if preset == "meme_caption" and not (layer.get("top") or layer.get("bottom") or layer.get("text")):
+        errors.append(f"{path}.top, {path}.bottom, or {path}.text is required for meme_caption presets")
+    if preset == "form_field" and not (layer.get("label") or layer.get("text") or layer.get("value")):
+        errors.append(f"{path}.label, {path}.value, or {path}.text is required for form_field presets")
+    for field in ("fill", "button_color", "text_color", "label_color", "border_color", "color"):
+        validate_color(errors, f"{path}.{field}", layer.get(field))
+
+
 def validate_layer(errors: list[str], path: str, layer: Any, *, scene_duration_value: float) -> None:
     if not isinstance(layer, dict):
         errors.append(f"{path} must be an object")
@@ -1829,10 +2140,18 @@ def validate_layer(errors: list[str], path: str, layer: Any, *, scene_duration_v
     validate_color(errors, f"{path}.color", layer.get("color"))
     validate_color(errors, f"{path}.panel_color", layer.get("panel_color"))
     validate_color(errors, f"{path}.border_color", layer.get("border_color"))
+    validate_color(errors, f"{path}.background", layer.get("background"))
+    validate_color(errors, f"{path}.fill", layer.get("fill"))
+    if layer_type == "shape":
+        validate_shape_layer(errors, path, layer)
+    elif layer_type == "preset":
+        validate_preset_layer(errors, path, layer)
     if layer_type == "media":
         allowed_keyframe_props = {"x", "y", "opacity", "scale"}
     elif layer_type in {"panel", "lower_third"}:
         allowed_keyframe_props = {"x", "y", "opacity"}
+    elif layer_type == "shape":
+        allowed_keyframe_props = {"opacity"}
     else:
         allowed_keyframe_props = set()
     validate_animation(errors, path, layer, layer_type=layer_type, allowed_props=allowed_keyframe_props)
