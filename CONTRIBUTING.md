@@ -110,6 +110,7 @@ Common checks:
 - `ffprobe` checks for video/audio streams
 - contact sheets or representative frames for visual features
 - audio level checks when sound matters
+- `vidkit qa <input.mp4> --out <dir>` for a reusable probe/contact/frame/audio summary bundle
 
 Important: an audio stream is not proof that audio is usable. If sound is part of the feature, check audibility/levels.
 

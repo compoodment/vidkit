@@ -54,6 +54,22 @@ def average_frame(video: Path, timestamp: float) -> float:
     return sum(raw) / len(raw)
 
 
+def audio_stream_count(video: Path) -> int:
+    out = subprocess.check_output([
+        bin_path("ffprobe"),
+        "-v",
+        "error",
+        "-select_streams",
+        "a",
+        "-show_entries",
+        "stream=index",
+        "-of",
+        "csv=p=0",
+        str(video),
+    ], text=True)
+    return len([line for line in out.splitlines() if line.strip()])
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="vidkit-selftest-") as tmp:
         tmpdir = Path(tmp)
@@ -224,6 +240,48 @@ def main() -> int:
         failed = run([wrapper_path("vidkit"), "--validate-only", str(invalid_preset_path)], check=False)
         if failed.returncode == 0 or "text is required" not in (failed.stdout + failed.stderr):
             raise SystemExit("invalid preset selftest failed")
+
+        sfx_example = ROOT / "examples" / "vidkit.sfx-example.json"
+        sfx_video = tmpdir / "sfx.mp4"
+        run([wrapper_path("vidkit"), "--validate-only", str(sfx_example)])
+        run([wrapper_path("vidkit"), str(sfx_example), str(sfx_video)])
+        if audio_stream_count(sfx_video) < 1:
+            raise SystemExit("sfx example selftest failed: expected audio stream")
+
+        invalid_sfx = {
+            "size": "160x90",
+            "scenes": [{"type": "card", "duration": 0.5, "audio": {"type": "sfx", "preset": "airhorn"}}],
+        }
+        invalid_sfx_path = tmpdir / "invalid-sfx.json"
+        write_json(invalid_sfx_path, invalid_sfx)
+        failed = run([wrapper_path("vidkit"), "--validate-only", str(invalid_sfx_path)], check=False)
+        if failed.returncode == 0 or "unsupported sfx preset" not in (failed.stdout + failed.stderr):
+            raise SystemExit("invalid sfx preset selftest failed")
+
+        qa_dir = tmpdir / "qa"
+        run([wrapper_path("vidkit"), "qa", str(sfx_video), "--out", str(qa_dir), "--frames", "2"])
+        expected_qa = ["probe.json", "contact.jpg", "frame-01.jpg", "frame-02.jpg", "audio-levels.txt", "summary.json"]
+        missing = [name for name in expected_qa if not (qa_dir / name).exists()]
+        if missing:
+            raise SystemExit(f"qa selftest failed: missing {missing}")
+        summary = json.loads((qa_dir / "summary.json").read_text(encoding="utf-8"))
+        if summary.get("audio_status") != "audible" or summary.get("effectively_silent"):
+            raise SystemExit(f"qa selftest failed: unexpected audio summary {summary}")
+
+        silent_spec = {
+            "size": "160x90",
+            "fps": 10,
+            "scenes": [{"type": "card", "duration": 0.5, "title": "quiet", "audio": {"type": "silence"}}],
+        }
+        silent_path = tmpdir / "silent.json"
+        silent_video = tmpdir / "silent.mp4"
+        silent_qa = tmpdir / "silent-qa"
+        write_json(silent_path, silent_spec)
+        run([wrapper_path("vidkit"), str(silent_path), str(silent_video)])
+        run([wrapper_path("vidkit"), "qa", str(silent_video), "--out", str(silent_qa), "--frames", "1"])
+        silent_summary = json.loads((silent_qa / "summary.json").read_text(encoding="utf-8"))
+        if silent_summary.get("audio_status") != "effectively_silent" or not silent_summary.get("effectively_silent"):
+            raise SystemExit(f"qa silent selftest failed: unexpected audio summary {silent_summary}")
 
     print("selftest passed")
     return 0

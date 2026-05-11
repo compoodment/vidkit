@@ -116,7 +116,7 @@ Preset layers use `"type": "preset"` with a `"preset"` name. First-pass presets 
 
 Transitions: `fade`, `wipeleft`, `wiperight`, `slideleft`, `slideright`, `circleopen`, `circleclose`.
 
-Generated audio: `silence`, `tone`, `noise`, `pulse`. A top-level audio bed can mix generated or source audio under the rendered scenes.
+Generated audio: `silence`, `tone`, `noise`, `pulse`, `sfx`. A top-level audio bed can mix generated or source audio under the rendered scenes. SFX presets are deterministic generated utility cues, not samples or production music: `bonk`, `error_beep`, `whoosh`, `censor_beep`, `printer_panic`, and `meow_ish`.
 
 ## Examples
 
@@ -126,13 +126,20 @@ python3 tools/vidkit-compose.py examples/vidkit.motion-example.json motion.mp4
 python3 tools/vidkit-compose.py examples/vidkit.motion-polish-example.json polish.mp4
 python3 tools/vidkit-compose.py examples/vidkit.animation-presets-example.json presets.mp4
 python3 tools/vidkit-compose.py examples/vidkit.shapes-presets-example.json shapes-presets.mp4
+python3 tools/vidkit-compose.py examples/vidkit.sfx-example.json sfx.mp4
 ```
 
 `examples/assets/sample.ppm` is bundled so the examples and templates work without private local media.
 
 ## Helper tool
 
-`tools/vidkit-helper.py` provides practical ffmpeg helpers: trim, contact sheets, frame extraction, GIF export, mux audio, burn subtitles, crop/scale/rotate/speed/concat, title cards, captions, fades, slideshow, and remix.
+`tools/vidkit-helper.py` provides practical ffmpeg helpers: trim, contact sheets, frame extraction, GIF export, mux audio, burn subtitles, crop/scale/rotate/speed/concat, title cards, captions, fades, slideshow, remix, and QA bundles.
+
+```bash
+python3 tools/vidkit.py qa input.mp4 --out artifacts/qa/input
+```
+
+The QA bundle writes `probe.json`, `contact.jpg`, representative `frame-*.jpg` stills, `audio-levels.txt` from `volumedetect`, and `summary.json`. When an audio stream exists, `summary.json` marks it `effectively_silent` if `max_volume` is at or below `-50 dBFS` by default.
 
 ## Verification
 

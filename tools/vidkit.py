@@ -25,6 +25,7 @@ Shortcuts:
   vidkit templates
   vidkit template:<name> out.mp4
   vidkit contact in.mp4 out.jpg
+  vidkit qa in.mp4 --out qa-dir
 
 Legacy wrappers remain available: video-compose, video-kit, video-compose-verify, video-compose-selftest.
 """
@@ -47,6 +48,7 @@ HELPER_SHORTCUTS = {
     "fade",
     "slideshow",
     "remix",
+    "qa",
 }
 
 

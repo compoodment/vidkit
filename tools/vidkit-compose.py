@@ -24,7 +24,8 @@ SCENE_TYPES = {"card", "bars", "particles", "wave", "grid", "orbits", "typewrite
 LAYER_TYPES = {"media", "panel", "text", "lower_third", "shape", "preset"}
 SHAPE_NAMES = {"progress_bar", "checkbox", "arrow", "cursor", "speech_bubble", "file_icon", "window"}
 PRESET_NAMES = {"error_dialog", "stamp", "meme_caption", "file_label", "terminal_prompt", "form_field", "warning_banner"}
-AUDIO_TYPES = {"none", "silence", "tone", "noise", "pulse"}
+AUDIO_TYPES = {"none", "silence", "tone", "noise", "pulse", "sfx"}
+SFX_PRESETS = {"bonk", "error_beep", "whoosh", "censor_beep", "printer_panic", "meow_ish"}
 FIT_TYPES = {"contain", "cover", "stretch"}
 CAMERA_TYPES = {"none", "zoom_in", "zoom_out", "pan", "shake"}
 TRANSITION_TYPES = {"fade", "wipeleft", "wiperight", "slideleft", "slideright", "circleopen", "circleclose", "none"}
@@ -195,7 +196,37 @@ def audio_source(scene: dict[str, Any], duration: float) -> str:
         period = float(audio.get("period", 0.5))
         duty = float(audio.get("duty", 0.16))
         return f"sine=frequency={frequency}:sample_rate=44100,volume='{volume}*lt(mod(t,{period}),{duty})'"
+    if kind == "sfx":
+        return sfx_source(audio, duration)
     raise SystemExit(f"unknown audio type: {kind}")
+
+
+def sfx_source(audio: dict[str, Any], duration: float) -> str:
+    preset = str(audio.get("preset", "bonk"))
+    volume = float(audio.get("volume", 1.0))
+    dur = max(0.08, float(audio.get("duration", duration)))
+    if preset == "bonk":
+        peak = 0.42 * volume
+        return f"sine=frequency=155:sample_rate=44100,volume='if(isnan(t),{peak},{peak}*exp(-10*t))':eval=frame,afade=t=out:st={max(0.04, dur - 0.18)}:d=0.18"
+    if preset == "error_beep":
+        return f"sine=frequency=880:sample_rate=44100,volume='{0.22 * volume}*(between(t,0,0.16)+between(t,0.26,0.42)+between(t,0.52,0.68))':eval=frame"
+    if preset == "whoosh":
+        return f"anoisesrc=color=pink:amplitude={0.20 * volume}:sample_rate=44100,highpass=f=260,lowpass=f=4200,afade=t=in:st=0:d={min(0.22, dur / 3)},afade=t=out:st={max(0.03, dur - 0.28)}:d=0.28"
+    if preset == "censor_beep":
+        return f"sine=frequency=1000:sample_rate=44100,volume={0.18 * volume},afade=t=in:st=0:d=0.015,afade=t=out:st={max(0.02, dur - 0.04)}:d=0.04"
+    if preset == "printer_panic":
+        return (
+            f"sine=frequency=760:sample_rate=44100,volume='{0.13 * volume}*lt(mod(t,0.11),0.055)':eval=frame[ticks];"
+            f"anoisesrc=color=white:amplitude={0.07 * volume}:sample_rate=44100,highpass=f=900,volume='lt(mod(t,0.17),0.035)':eval=frame[grit];"
+            "[ticks][grit]amix=inputs=2:duration=longest:normalize=0"
+        )
+    if preset == "meow_ish":
+        return (
+            f"sine=frequency=520:sample_rate=44100,volume='{0.16 * volume}*between(t,0,0.32)':eval=frame[m1];"
+            f"sine=frequency=690:sample_rate=44100,volume='{0.13 * volume}*between(t,0.18,0.52)':eval=frame[m2];"
+            "[m1][m2]amix=inputs=2:duration=longest:normalize=0,afade=t=out:st=0.45:d=0.16"
+        )
+    raise SystemExit(f"unknown sfx preset: {preset}")
 
 
 def fit_filter(width: int, height: int, fit: str, background: str = "black") -> str:
@@ -1940,6 +1971,13 @@ def validate_audio(errors: list[str], path: str, audio: Any) -> None:
     kind = audio.get("type", "silence")
     if kind not in AUDIO_TYPES:
         errors.append(f"{path}.type unsupported audio type: {kind}")
+    if kind == "sfx":
+        preset = audio.get("preset", "bonk")
+        if preset not in SFX_PRESETS:
+            errors.append(f"{path}.preset unsupported sfx preset: {preset}")
+        for field in ("volume", "duration"):
+            if field in audio:
+                validate_positive_number(errors, f"{path}.{field}", audio[field])
     if audio.get("source"):
         source = Path(audio["source"]).expanduser()
         if not source.exists():

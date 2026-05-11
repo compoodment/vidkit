@@ -1,0 +1,59 @@
+{
+  "size": "640x360",
+  "fps": 24,
+  "transition": {"type": "fade", "duration": 0.12},
+  "scenes": [
+    {
+      "type": "card",
+      "duration": 0.7,
+      "title": "BONK",
+      "subtitle": "generated sfx",
+      "background": "#121018",
+      "background2": "#301015",
+      "accent": "#ff5f57",
+      "audio": {"type": "sfx", "preset": "bonk", "volume": 0.9}
+    },
+    {
+      "type": "grid",
+      "duration": 0.9,
+      "title": "ERROR",
+      "subtitle": "three clean beeps",
+      "accent": "#f59e0b",
+      "audio": {"type": "sfx", "preset": "error_beep", "volume": 0.8}
+    },
+    {
+      "type": "wave",
+      "duration": 0.9,
+      "title": "WHOOSH",
+      "subtitle": "filtered generated noise",
+      "accent": "#38bdf8",
+      "audio": {"type": "sfx", "preset": "whoosh", "volume": 0.75}
+    },
+    {
+      "type": "card",
+      "duration": 0.8,
+      "title": "CENSOR",
+      "subtitle": "utility tone",
+      "background": "#020617",
+      "background2": "#172554",
+      "accent": "#ffffff",
+      "audio": {"type": "sfx", "preset": "censor_beep", "volume": 0.75}
+    },
+    {
+      "type": "bars",
+      "duration": 1.0,
+      "title": "PRINTER PANIC",
+      "subtitle": "ticks plus grit",
+      "accent": "#22c55e",
+      "audio": {"type": "sfx", "preset": "printer_panic", "volume": 0.85}
+    },
+    {
+      "type": "orbits",
+      "duration": 0.9,
+      "title": "MEOW-ISH",
+      "subtitle": "synthetic utility cue",
+      "accent": "#ec4899",
+      "audio": {"type": "sfx", "preset": "meow_ish", "volume": 0.8}
+    }
+  ]
+}

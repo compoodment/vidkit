@@ -18,12 +18,15 @@ Commands:
   fade      - add video/audio fade in/out
   slideshow - turn images into a simple timed video
   remix     - make a short glitchy edit from one clip
+  qa        - write a quick inspection bundle for a clip
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import math
+import re
 import shutil
 import subprocess
 import sys
@@ -51,6 +54,10 @@ def ffprobe_bin(name: str | None = None) -> str:
 
 def run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True)
+
+
+def run_capture(cmd: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(cmd, check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
 def esc_filter_path(path: Path) -> str:
@@ -135,11 +142,35 @@ def probe_duration(path: Path, ffprobe: str | None = None) -> float:
     return float(out)
 
 
+def probe_json(path: Path, ffprobe: str | None = None) -> dict:
+    probe = ensure_tool(ffprobe_bin(ffprobe), label="ffprobe")
+    out = run_capture([
+        probe,
+        "-v",
+        "error",
+        "-show_format",
+        "-show_streams",
+        "-of",
+        "json",
+        str(path),
+    ]).stdout
+    return json.loads(out)
+
+
 def has_audio(path: Path, ffprobe: str | None = None) -> bool:
     probe = ensure_tool(ffprobe_bin(ffprobe), label="ffprobe")
     cmd = [probe, "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=index", "-of", "csv=p=0", str(path)]
     out = subprocess.run(cmd, check=True, stdout=subprocess.PIPE, text=True).stdout.strip()
     return bool(out)
+
+
+def parse_volumedetect(stderr: str) -> dict[str, float | None]:
+    result: dict[str, float | None] = {"mean_volume_db": None, "max_volume_db": None}
+    for key, label in (("mean_volume_db", "mean_volume"), ("max_volume_db", "max_volume")):
+        match = re.search(rf"{label}:\s*(-?(?:inf|\d+(?:\.\d+)?)) dB", stderr)
+        if match:
+            result[key] = float("-inf") if match.group(1) == "-inf" else float(match.group(1))
+    return result
 
 
 def add_common(parser: argparse.ArgumentParser) -> None:
@@ -612,6 +643,107 @@ def cmd_remix(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_qa(args: argparse.Namespace) -> int:
+    ffmpeg = ensure_tool(args.ffmpeg)
+    probe = ensure_tool(ffprobe_bin(args.ffprobe), label="ffprobe")
+    args.out.mkdir(parents=True, exist_ok=True)
+
+    probe_data = probe_json(args.input, probe)
+    (args.out / "probe.json").write_text(json.dumps(probe_data, indent=2) + "\n", encoding="utf-8")
+    duration = float((probe_data.get("format") or {}).get("duration") or probe_duration(args.input, probe))
+    streams = probe_data.get("streams") or []
+    video_streams = [stream for stream in streams if stream.get("codec_type") == "video"]
+    audio_streams = [stream for stream in streams if stream.get("codec_type") == "audio"]
+
+    contact = args.out / "contact.jpg"
+    rows = max(1, math.ceil(args.contact_count / args.contact_cols))
+    interval = max(0.1, duration / max(1, args.contact_count))
+    run([
+        ffmpeg,
+        "-y",
+        "-i",
+        str(args.input),
+        "-frames:v",
+        "1",
+        "-update",
+        "1",
+        "-vf",
+        f"fps=1/{interval},scale={args.contact_scale}:-1:flags=lanczos,tile={args.contact_cols}x{rows}",
+        str(contact),
+    ])
+
+    frame_paths: list[str] = []
+    frame_count = max(1, args.frames)
+    for idx in range(frame_count):
+        fraction = (idx + 1) / (frame_count + 1)
+        timestamp = max(0.0, min(duration, duration * fraction))
+        frame_path = args.out / f"frame-{idx + 1:02d}.jpg"
+        run([
+            ffmpeg,
+            "-y",
+            "-ss",
+            f"{timestamp:.3f}",
+            "-i",
+            str(args.input),
+            "-frames:v",
+            "1",
+            "-update",
+            "1",
+            "-q:v",
+            "2",
+            str(frame_path),
+        ])
+        frame_paths.append(frame_path.name)
+
+    audio_report = args.out / "audio-levels.txt"
+    audio_levels: dict[str, float | None] = {"mean_volume_db": None, "max_volume_db": None}
+    audio_status = "no_audio_stream"
+    effectively_silent = False
+    if audio_streams:
+        level_cmd = [
+            ffmpeg,
+            "-hide_banner",
+            "-i",
+            str(args.input),
+            "-map",
+            "0:a:0",
+            "-af",
+            "volumedetect",
+            "-f",
+            "null",
+            "-",
+        ]
+        completed = subprocess.run(level_cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        audio_report.write_text(completed.stderr, encoding="utf-8")
+        audio_levels = parse_volumedetect(completed.stderr)
+        max_volume = audio_levels.get("max_volume_db")
+        effectively_silent = max_volume is None or max_volume == float("-inf") or max_volume <= args.silence_threshold
+        audio_status = "effectively_silent" if effectively_silent else "audible"
+    else:
+        audio_report.write_text("no audio stream detected\n", encoding="utf-8")
+
+    summary = {
+        "input": str(args.input),
+        "duration": duration,
+        "video_streams": len(video_streams),
+        "audio_streams": len(audio_streams),
+        "audio_status": audio_status,
+        "effectively_silent": effectively_silent,
+        "silence_threshold_db": args.silence_threshold,
+        "mean_volume_db": audio_levels.get("mean_volume_db"),
+        "max_volume_db": audio_levels.get("max_volume_db"),
+        "artifacts": {
+            "probe": "probe.json",
+            "contact": contact.name,
+            "frames": frame_paths,
+            "audio_report": audio_report.name,
+        },
+    }
+    (args.out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    print(f"wrote QA bundle: {args.out}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Tiny ffmpeg helper for video edits.")
     sp = p.add_subparsers(dest="cmd", required=True)
@@ -769,6 +901,18 @@ def build_parser() -> argparse.ArgumentParser:
     re.add_argument("--noise", type=int, default=16, help="video noise strength")
     add_common(re)
     re.set_defaults(func=cmd_remix)
+
+    qa = sp.add_parser("qa", help="write a quick inspection bundle for a clip")
+    qa.add_argument("input", type=Path)
+    qa.add_argument("--out", required=True, type=Path, help="output directory for probe, frames, contact sheet, and summary")
+    qa.add_argument("--frames", type=int, default=3, help="representative frame count")
+    qa.add_argument("--contact-count", type=int, default=12, help="approximate contact sheet thumbnails")
+    qa.add_argument("--contact-cols", type=int, default=4, help="contact sheet columns")
+    qa.add_argument("--contact-scale", type=int, default=240, help="contact thumbnail width")
+    qa.add_argument("--silence-threshold", type=float, default=-50.0, help="max_volume dBFS at or below this is effectively silent")
+    qa.add_argument("--ffprobe", default=ffprobe_bin(), help="ffprobe executable")
+    add_common(qa)
+    qa.set_defaults(func=cmd_qa)
 
     return p
 
