@@ -40,6 +40,8 @@ Core templates:
 - `band-glitch`
 - `media-card`
 - `split-screen`
+- `chat-window`
+- `application-form`
 
 ## Custom specs
 
@@ -80,6 +82,7 @@ Scene types:
 - generated: `card`, `bars`, `particles`, `wave`, `grid`, `orbits`, `typewriter`
 - media: `image` / `media`
 - compositing: `layered`
+- utility beats: `beat`
 
 Layer types in a `layered` scene:
 
@@ -161,6 +164,14 @@ Transitions: `fade`, `wipeleft`, `wiperight`, `slideleft`, `slideright`, `circle
 
 Generated audio: `silence`, `tone`, `noise`, `pulse`, `sfx`. A top-level audio bed can mix generated or source audio under the rendered scenes. SFX presets are deterministic generated utility cues, not samples or production music: `bonk`, `error_beep`, `whoosh`, `censor_beep`, `printer_panic`, and `meow_ish`.
 
+Beat scenes are short reusable comedy beats that expand into ordinary generated/layered scenes before rendering. Use `"type": "beat"` with a `"preset"` plus simple text/color/audio overrides. Supported beat presets are `hard_cut_card`, `bonk`, `censor_meow`, `zoom_punch`, and `error_flash`.
+
+```json
+{"type": "beat", "preset": "bonk", "duration": 0.75, "text": "BONK"}
+```
+
+Each beat has a generated utility sound by default; set `"audio": {"type": "silence"}` or provide another generated audio object to override it.
+
 ## Examples
 
 ```bash
@@ -172,6 +183,7 @@ python3 tools/vidkit-compose.py examples/vidkit.camera-sprite-example.json camer
 python3 tools/vidkit-compose.py examples/vidkit.sprite-path-example.json sprite-path.mp4
 python3 tools/vidkit-compose.py examples/vidkit.shapes-presets-example.json shapes-presets.mp4
 python3 tools/vidkit-compose.py examples/vidkit.sfx-example.json sfx.mp4
+python3 tools/vidkit-compose.py examples/vidkit.comedy-beats-example.json comedy-beats.mp4
 ```
 
 `examples/assets/sample.ppm` is bundled so the examples and templates work without private local media.
@@ -192,7 +204,7 @@ The QA bundle writes `probe.json`, `contact.jpg`, representative `frame-*.jpg` s
 python3 tools/vidkit-verify.py
 ```
 
-The verifier validates and renders the six built-in templates, probes H.264/AAC streams with `ffprobe`, and creates contact sheets for selected templates. `tools/vidkit-selftest.py` adds focused behavioral checks for template listing/export, validation, opacity keyframes, and animation presets.
+The verifier validates and renders the built-in templates, probes H.264/AAC streams with `ffprobe`, and creates contact sheets for selected templates. `tools/vidkit-selftest.py` adds focused behavioral checks for template listing/export, validation, opacity keyframes, animation presets, SFX, and beat presets.
 
 ## OpenClaw skill
 

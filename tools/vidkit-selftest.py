@@ -75,7 +75,7 @@ def main() -> int:
         tmpdir = Path(tmp)
 
         templates = run([wrapper_path("vidkit"), "templates"]).stdout.splitlines()
-        if "media-card" not in templates or "split-screen" not in templates:
+        if "media-card" not in templates or "split-screen" not in templates or "chat-window" not in templates or "application-form" not in templates:
             raise SystemExit(f"template list selftest failed: {templates}")
         initialized = tmpdir / "initialized.json"
         run([wrapper_path("vidkit"), "init", "media-card", str(initialized)])
@@ -83,6 +83,9 @@ def main() -> int:
         shown = run([wrapper_path("vidkit"), "show", "template:media-card"]).stdout
         if "examples/assets/sample.ppm" not in shown:
             raise SystemExit("template show selftest failed: expected portable sample asset path")
+        chat_shown = run([wrapper_path("vidkit"), "show", "template:chat-window"]).stdout
+        if "team-chat" not in chat_shown:
+            raise SystemExit("new template show selftest failed")
         failed = run([wrapper_path("vidkit"), "templates", "unexpected"], check=False)
         if failed.returncode == 0:
             raise SystemExit("extra-argument selftest failed")
@@ -348,6 +351,33 @@ def main() -> int:
         run([wrapper_path("vidkit"), str(sfx_example), str(sfx_video)])
         if audio_stream_count(sfx_video) < 1:
             raise SystemExit("sfx example selftest failed: expected audio stream")
+
+        beats_example = ROOT / "examples" / "vidkit.comedy-beats-example.json"
+        beats_video = tmpdir / "beats.mp4"
+        run([wrapper_path("vidkit"), "--validate-only", str(beats_example)])
+        run([wrapper_path("vidkit"), str(beats_example), str(beats_video)])
+        if audio_stream_count(beats_video) < 1:
+            raise SystemExit("beat example selftest failed: expected audio stream")
+
+        invalid_beat_preset = {
+            "size": "160x90",
+            "scenes": [{"type": "beat", "duration": 0.5, "preset": "rimshot"}],
+        }
+        invalid_beat_preset_path = tmpdir / "invalid-beat-preset.json"
+        write_json(invalid_beat_preset_path, invalid_beat_preset)
+        failed = run([wrapper_path("vidkit"), "--validate-only", str(invalid_beat_preset_path)], check=False)
+        if failed.returncode == 0 or "unsupported beat preset" not in (failed.stdout + failed.stderr):
+            raise SystemExit("invalid beat preset selftest failed")
+
+        invalid_beat_field = {
+            "size": "160x90",
+            "scenes": [{"type": "beat", "duration": 0.5, "preset": "bonk", "storyboard": []}],
+        }
+        invalid_beat_field_path = tmpdir / "invalid-beat-field.json"
+        write_json(invalid_beat_field_path, invalid_beat_field)
+        failed = run([wrapper_path("vidkit"), "--validate-only", str(invalid_beat_field_path)], check=False)
+        if failed.returncode == 0 or "unsupported beat option" not in (failed.stdout + failed.stderr):
+            raise SystemExit("invalid beat option selftest failed")
 
         invalid_sfx = {
             "size": "160x90",

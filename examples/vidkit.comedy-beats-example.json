@@ -1,0 +1,42 @@
+{
+  "size": "640x360",
+  "fps": 24,
+  "scenes": [
+    {
+      "type": "beat",
+      "preset": "hard_cut_card",
+      "duration": 0.65,
+      "title": "MEANWHILE",
+      "subtitle": "two seconds before the demo",
+      "accent": "#facc15"
+    },
+    {
+      "type": "beat",
+      "preset": "zoom_punch",
+      "duration": 0.9,
+      "text": "ENHANCE",
+      "accent": "#38bdf8"
+    },
+    {
+      "type": "beat",
+      "preset": "censor_meow",
+      "duration": 0.85,
+      "text": "the secret deploy phrase was definitely safe",
+      "label": "MEOW"
+    },
+    {
+      "type": "beat",
+      "preset": "bonk",
+      "duration": 0.75,
+      "text": "BONK",
+      "accent": "#ff5f57"
+    },
+    {
+      "type": "beat",
+      "preset": "error_flash",
+      "duration": 1.0,
+      "text": "too many tabs open",
+      "button": "understood"
+    }
+  ]
+}

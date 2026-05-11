@@ -14,8 +14,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "artifacts/vidkit/verify"
-TEMPLATES = ["lower-third", "motion-card", "glitch-card", "band-glitch", "media-card", "split-screen"]
-CONTACTS = {"lower-third", "band-glitch", "split-screen"}
+TEMPLATES = ["lower-third", "motion-card", "glitch-card", "band-glitch", "media-card", "split-screen", "chat-window", "application-form"]
+CONTACTS = {"lower-third", "band-glitch", "split-screen", "chat-window", "application-form"}
 
 
 def bin_path(name: str) -> str:

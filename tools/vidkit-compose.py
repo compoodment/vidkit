@@ -20,12 +20,13 @@ from pathlib import Path
 from typing import Any
 
 
-SCENE_TYPES = {"card", "bars", "particles", "wave", "grid", "orbits", "typewriter", "image", "media", "layered"}
+SCENE_TYPES = {"card", "bars", "particles", "wave", "grid", "orbits", "typewriter", "image", "media", "layered", "beat"}
 LAYER_TYPES = {"media", "sprite", "panel", "text", "lower_third", "shape", "preset"}
 SHAPE_NAMES = {"progress_bar", "checkbox", "arrow", "cursor", "speech_bubble", "file_icon", "window"}
 PRESET_NAMES = {"error_dialog", "stamp", "meme_caption", "file_label", "terminal_prompt", "form_field", "warning_banner"}
 AUDIO_TYPES = {"none", "silence", "tone", "noise", "pulse", "sfx"}
 SFX_PRESETS = {"bonk", "error_beep", "whoosh", "censor_beep", "printer_panic", "meow_ish"}
+BEAT_PRESETS = {"hard_cut_card", "bonk", "censor_meow", "zoom_punch", "error_flash"}
 FIT_TYPES = {"contain", "cover", "stretch"}
 CAMERA_TYPES = {"none", "zoom_in", "zoom_out", "pan", "shake"}
 TRANSITION_TYPES = {"fade", "wipeleft", "wiperight", "slideleft", "slideright", "circleopen", "circleclose", "none"}
@@ -33,7 +34,7 @@ EASING_TYPES = {"linear", "none", "in_quad", "ease_in", "out_quad", "ease_out", 
 ANIMATION_PRESETS = {"fade", "fade_in", "fade_out", "slide_left", "slide_right", "slide_up", "slide_down", "pop", "none"}
 SPRITE_ANIMATION_PRESETS = {"blink", "bounce", "jitter", "squash", "pop", "slap"}
 PATH_TYPES = {"points"}
-TEMPLATE_NAMES = ("lower-third", "motion-card", "glitch-card", "band-glitch", "media-card", "split-screen")
+TEMPLATE_NAMES = ("lower-third", "motion-card", "glitch-card", "band-glitch", "media-card", "split-screen", "chat-window", "application-form")
 
 
 def ffmpeg_bin(name: str | None = None) -> str:
@@ -879,6 +880,127 @@ def expand_layers(layers: list[dict[str, Any]], *, duration: float, scene_w: int
                 expanded_layer = {**expanded_layer, "type": "media"}
             expanded.append(expanded_layer)
     return expanded
+
+
+def beat_preset_name(scene: dict[str, Any]) -> str:
+    return str(scene.get("preset", scene.get("name", "hard_cut_card")))
+
+
+def beat_text(scene: dict[str, Any], default: str) -> str:
+    return str(scene.get("text", scene.get("title", default)))
+
+
+def beat_audio(scene: dict[str, Any], default: dict[str, Any]) -> dict[str, Any]:
+    audio = scene.get("audio")
+    if audio is False or audio == "none":
+        return {"type": "silence"}
+    if isinstance(audio, dict):
+        return audio
+    return default
+
+
+def expand_beat_scene(scene: dict[str, Any]) -> dict[str, Any]:
+    preset = beat_preset_name(scene)
+    duration = float(scene.get("duration", 0.8))
+    transition = scene.get("transition")
+    captions = scene.get("captions")
+
+    def with_common(out: dict[str, Any]) -> dict[str, Any]:
+        out.setdefault("duration", duration)
+        if transition is not None:
+            out["transition"] = transition
+        if captions:
+            out["captions"] = captions
+        return out
+
+    if preset == "hard_cut_card":
+        return with_common(
+            {
+                "type": "card",
+                "title": beat_text(scene, "CUT TO:"),
+                "subtitle": scene.get("subtitle", ""),
+                "background": scene.get("background", "#050510"),
+                "background2": scene.get("background2", "#1f1028"),
+                "accent": scene.get("accent", "#ffffff"),
+                "noise": int(scene.get("noise", 2)),
+                "audio": beat_audio(scene, {"type": "sfx", "preset": "whoosh", "duration": min(0.35, duration), "volume": 0.35}),
+            }
+        )
+
+    if preset == "bonk":
+        text = beat_text(scene, "BONK")
+        return with_common(
+            {
+                "type": "layered",
+                "background": scene.get("background", "#160b14"),
+                "audio": beat_audio(scene, {"type": "sfx", "preset": "bonk", "duration": min(0.55, duration), "volume": 0.9}),
+                "camera": {"shake": {"start": 0.04, "end": min(duration, 0.36), "amount": 11, "frequency": 22}},
+                "layers": [
+                    {"type": "panel", "x": 54, "y": 72, "width": 532, "height": 196, "panel_color": scene.get("accent", "#ff5f57"), "radius": 18, "opacity": 0.88, "keyframes": [{"time": 0.0, "opacity": 0.0}, {"time": min(duration, 0.08), "opacity": 0.88}]},
+                    {"type": "preset", "preset": "stamp", "x": 132, "y": 112, "width": 376, "height": 106, "text": text, "color": scene.get("text_color", "#ffffff"), "fill_opacity": 0.0, "border": 5, "size": int(scene.get("size", 56))},
+                    {"type": "shape", "shape": "arrow", "x": 46, "y": 50, "width": 148, "height": 34, "color": "#facc15"},
+                    {"type": "shape", "shape": "arrow", "x": 446, "y": 274, "width": 148, "height": 34, "direction": "left", "color": "#facc15"},
+                ],
+            }
+        )
+
+    if preset == "censor_meow":
+        text = beat_text(scene, "absolutely normal sentence")
+        return with_common(
+            {
+                "type": "layered",
+                "background": scene.get("background", "#0b1220"),
+                "audio": beat_audio(scene, {"type": "sfx", "preset": "meow_ish", "duration": min(0.7, duration), "volume": 0.85}),
+                "layers": [
+                    {"type": "shape", "shape": "speech_bubble", "x": 88, "y": 86, "width": 464, "height": 138, "fill": "#ffffff", "text": text, "wrap": 30, "size": int(scene.get("size", 24))},
+                    {"type": "panel", "x": 156, "y": 132, "width": 328, "height": 44, "panel_color": scene.get("accent", "#111827"), "radius": 6, "keyframes": [{"time": 0.0, "opacity": 0.0}, {"time": min(duration, 0.12), "opacity": 1.0}]},
+                    {"type": "text", "text": scene.get("label", "MEOW"), "x": 320, "y": 153, "size": 24, "color": "white"},
+                ],
+            }
+        )
+
+    if preset == "zoom_punch":
+        text = beat_text(scene, "ENHANCE")
+        return with_common(
+            {
+                "type": "layered",
+                "background": scene.get("background", "#08111f"),
+                "audio": beat_audio(scene, {"type": "sfx", "preset": "whoosh", "duration": min(0.65, duration), "volume": 0.8}),
+                "camera": {
+                    "keyframes": [
+                        {"time": 0.0, "scale": 1.0},
+                        {"time": min(duration, 0.22), "scale": 1.18, "ease": "out_cubic"},
+                        {"time": duration, "scale": 1.1, "ease": "out_quad"},
+                    ],
+                    "shake": {"start": 0.1, "end": min(duration, 0.38), "amount": 5, "frequency": 18},
+                },
+                "layers": [
+                    {"type": "shape", "shape": "window", "x": 80, "y": 52, "width": 480, "height": 246, "fill": "#e5e7eb", "border_color": scene.get("accent", "#38bdf8"), "chrome_color": "#111827", "title": "analysis-panel"},
+                    {"type": "shape", "shape": "progress_bar", "x": 128, "y": 118, "width": 384, "height": 22, "value": 0.82, "fill": "#22c55e", "background": "#cbd5e1"},
+                    {"type": "preset", "preset": "stamp", "x": 170, "y": 162, "width": 300, "height": 74, "text": text, "color": scene.get("text_color", "#ffffff"), "fill_opacity": 0.06, "size": int(scene.get("size", 38))},
+                ],
+            }
+        )
+
+    if preset == "error_flash":
+        text = beat_text(scene, "NOPE")
+        return with_common(
+            {
+                "type": "layered",
+                "background": scene.get("background", "#190707"),
+                "audio": beat_audio(scene, {"type": "sfx", "preset": "error_beep", "duration": min(0.75, duration), "volume": 0.8}),
+                "layers": [
+                    {"type": "panel", "panel_color": scene.get("accent", "#ef4444"), "opacity": 0.0, "keyframes": [{"time": 0.0, "opacity": 0.0}, {"time": min(duration, 0.06), "opacity": 0.72}, {"time": min(duration, 0.22), "opacity": 0.0}]},
+                    {"type": "preset", "preset": "error_dialog", "x": 112, "y": 72, "width": 416, "height": 194, "title": "Runtime Complaint", "text": text, "button": scene.get("button", "Fine"), "animate": {"in": "slide_down", "duration": 0.16, "distance": 24}},
+                ],
+            }
+        )
+
+    raise SystemExit(f"unsupported beat preset: {preset}")
+
+
+def expand_beat_scenes(scenes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [expand_beat_scene(scene) if scene.get("type") == "beat" else scene for scene in scenes]
 
 
 def scene_transition(scene: dict[str, Any], default: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -2060,6 +2182,51 @@ def template_spec(name: str) -> dict[str, Any]:
                 }
             ],
         }
+    if name == "chat-window":
+        return {
+            "size": "640x360",
+            "fps": 24,
+            "scenes": [
+                {
+                    "type": "layered",
+                    "duration": 4.2,
+                    "background": "#0b1220",
+                    "audio": {"type": "sfx", "preset": "meow_ish", "duration": 0.7, "volume": 0.38},
+                    "camera": {"keyframes": [{"time": 0, "scale": 1.0}, {"time": 4.2, "scale": 1.04, "ease": "out_quad"}]},
+                    "layers": [
+                        {"type": "shape", "shape": "window", "x": 72, "y": 34, "width": 496, "height": 292, "fill": "#f8fafc", "border_color": "#38bdf8", "chrome_color": "#111827", "title": "team-chat"},
+                        {"type": "shape", "shape": "speech_bubble", "x": 104, "y": 82, "width": 328, "height": 70, "fill": "#dbeafe", "text": "Can the launch wait until after coffee?", "wrap": 30, "size": 20},
+                        {"type": "shape", "shape": "speech_bubble", "x": 206, "y": 168, "width": 330, "height": 72, "fill": "#dcfce7", "text": "The deploy button has other plans.", "wrap": 30, "size": 20},
+                        {"type": "shape", "shape": "cursor", "x": 498, "y": 256, "width": 24, "height": 32, "color": "#111827", "outline": "#ffffff"},
+                        {"type": "panel", "x": 108, "y": 278, "width": 424, "height": 28, "panel_color": "#e5e7eb", "radius": 12},
+                        {"type": "text", "text": "typing...", "x": 124, "y": 289, "size": 17, "align": 7, "color": "#475569"},
+                    ],
+                }
+            ],
+        }
+    if name == "application-form":
+        return {
+            "size": "640x360",
+            "fps": 24,
+            "scenes": [
+                {
+                    "type": "layered",
+                    "duration": 4.4,
+                    "background": "#111827",
+                    "audio": {"type": "pulse", "frequency": 520, "volume": 0.02, "period": 0.42, "duty": 0.05},
+                    "layers": [
+                        {"type": "shape", "shape": "window", "x": 64, "y": 24, "width": 512, "height": 312, "fill": "#f8fafc", "border_color": "#94a3b8", "chrome_color": "#1f2937", "title": "application-form.json"},
+                        {"type": "preset", "preset": "form_field", "x": 104, "y": 74, "width": 210, "height": 34, "label": "Name", "value": "A. Example", "label_color": "#334155"},
+                        {"type": "preset", "preset": "form_field", "x": 104, "y": 144, "width": 210, "height": 34, "label": "Reason", "value": "urgent bit", "label_color": "#334155"},
+                        {"type": "preset", "preset": "form_field", "x": 348, "y": 74, "width": 150, "height": 34, "label": "Priority", "value": "medium?", "label_color": "#334155", "border_color": "#f59e0b"},
+                        {"type": "shape", "shape": "checkbox", "x": 350, "y": 164, "size": 28, "checked": True, "color": "#16a34a", "border_color": "#16a34a"},
+                        {"type": "text", "text": "I accept the consequences", "x": 388, "y": 175, "size": 18, "align": 4, "color": "#111827"},
+                        {"type": "preset", "preset": "warning_banner", "x": 104, "y": 244, "width": 392, "height": 42, "text": "Status: pending review by a very small committee", "fill": "#facc15", "size": 18},
+                        {"type": "shape", "shape": "cursor", "x": 510, "y": 270, "width": 26, "height": 34, "color": "#ffffff", "outline": "#111827"},
+                    ],
+                }
+            ],
+        }
     raise SystemExit(f"unknown template: {name} (try {', '.join(TEMPLATE_NAMES)})")
 
 
@@ -2483,6 +2650,40 @@ def validate_preset_layer(errors: list[str], path: str, layer: dict[str, Any]) -
         validate_color(errors, f"{path}.{field}", layer.get(field))
 
 
+def validate_beat_scene(errors: list[str], path: str, scene: dict[str, Any]) -> None:
+    known = {
+        "type",
+        "preset",
+        "name",
+        "duration",
+        "text",
+        "title",
+        "subtitle",
+        "label",
+        "button",
+        "size",
+        "background",
+        "background2",
+        "accent",
+        "text_color",
+        "audio",
+        "transition",
+        "captions",
+        "noise",
+    }
+    for key in scene:
+        if key not in known:
+            errors.append(f"{path}.{key} unsupported beat option")
+    preset = beat_preset_name(scene)
+    if preset not in BEAT_PRESETS:
+        errors.append(f"{path}.preset unsupported beat preset: {preset}")
+    for field in ("background", "background2", "accent", "text_color"):
+        validate_color(errors, f"{path}.{field}", scene.get(field))
+    for field in ("size", "noise"):
+        if field in scene:
+            validate_positive_number(errors, f"{path}.{field}", scene[field], allow_zero=(field == "noise"))
+
+
 def validate_layer(errors: list[str], path: str, layer: Any, *, scene_duration_value: float) -> None:
     if not isinstance(layer, dict):
         errors.append(f"{path} must be an object")
@@ -2573,6 +2774,9 @@ def validate_scene(errors: list[str], path: str, scene: Any) -> None:
     validate_color(errors, f"{path}.background", scene.get("background"))
     validate_color(errors, f"{path}.background2", scene.get("background2"))
     validate_color(errors, f"{path}.accent", scene.get("accent"))
+    if kind == "beat":
+        validate_beat_scene(errors, path, scene)
+        return
     if kind == "layered" or scene.get("layers"):
         validate_layered_camera(errors, f"{path}.camera", scene.get("camera"), duration=duration_value)
     if kind in {"image", "media"}:
@@ -2633,7 +2837,7 @@ def render_spec(spec: dict[str, Any], out: Path, ffmpeg: str) -> None:
     assert_valid_spec(spec)
     w, h = parse_size(spec.get("size", "1280x720"))
     fps = int(spec.get("fps", 24))
-    scenes = spec.get("scenes") or []
+    scenes = expand_beat_scenes(spec.get("scenes") or [])
     if not scenes:
         raise SystemExit("spec has no scenes")
     with tempfile.TemporaryDirectory(prefix="vidkit-") as tmp:
