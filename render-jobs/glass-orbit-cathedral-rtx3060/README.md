@@ -1,6 +1,6 @@
 # glass-orbit-cathedral-rtx3060
 
-Purpose: smoke-test the Blender backend on Vale/computment's RTX3060 laptop at better quality than Coda's CPU-only VPS.
+Purpose: smoke-test the Blender backend on a remote RTX3060-class GPU machine at better quality than a CPU-only VPS.
 
 Expected renderer:
 
@@ -29,4 +29,4 @@ Outputs:
 - `outputs/glass-orbit-cathedral-rtx3060.render.log`
 - `outputs/glass-orbit-cathedral-rtx3060-frames/` frame sequence
 
-Return the MP4/probe/log to Coda for QA/assembly. If render fails, return the `.render.log` and say whether the device log showed CUDA/OptiX or CPU only.
+Return the MP4/probe/log for QA for QA/assembly. If render fails, return the `.render.log` and say whether the device log showed CUDA/OptiX or CPU only.

@@ -33,7 +33,7 @@ VIDKIT_WIDTH="${VIDKIT_WIDTH:-1280}" VIDKIT_HEIGHT="${VIDKIT_HEIGHT:-720}" VIDKI
 render_status=${PIPESTATUS[0]}
 set -e
 if [ "$render_status" -ne 0 ]; then
-  echo "Render failed. Return this log to Coda: $LOG" >&2
+  echo "Render failed. Return this log for QA: $LOG" >&2
   exit "$render_status"
 fi
 ffmpeg -y -framerate "${VIDKIT_FPS:-24}" -i "$FRAMES_DIR/frame_%04d.png" -c:v libx264 -pix_fmt yuv420p "$VIDEO_NO_AUDIO" 2>&1 | tee -a "$LOG"

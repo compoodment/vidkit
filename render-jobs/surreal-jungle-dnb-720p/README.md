@@ -4,7 +4,7 @@
 
 Audio: generated 174 BPM jungle/DnB-ish bed from `make_audio.py`.
 
-Run from repo root on Vale's WSL2 RTX3060 setup:
+Run from repo root on a remote RTX3060-class WSL2/Linux setup:
 
 ```bash
 render-jobs/surreal-jungle-dnb-720p/run.sh

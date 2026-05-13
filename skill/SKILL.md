@@ -5,7 +5,7 @@ description: Create, edit, compose, render, verify, or iterate scripted videos u
 
 # Vidkit
 
-Use this when computment asks to make or edit videos programmatically.
+Use this when the user asks to make or edit videos programmatically.
 
 ## Local tools
 

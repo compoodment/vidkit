@@ -28,7 +28,7 @@ python3 "$ROOT/tools/vidkit-blender.py" render "$JOB_DIR/scene.json" "$OUT_MP4" 
 render_status=${PIPESTATUS[0]}
 set -e
 if [ "$render_status" -ne 0 ]; then
-  echo "Render failed. Return this log to Coda: $LOG" >&2
+  echo "Render failed. Return this log for QA: $LOG" >&2
   exit "$render_status"
 fi
 
