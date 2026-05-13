@@ -12,7 +12,7 @@ FPS = int(os.environ.get("VIDKIT_FPS", "24"))
 DURATION = float(os.environ.get("VIDKIT_DURATION", "120"))
 WIDTH = int(os.environ.get("VIDKIT_WIDTH", "1280"))
 HEIGHT = int(os.environ.get("VIDKIT_HEIGHT", "720"))
-SAMPLES = int(os.environ.get("VIDKIT_SAMPLES", "48"))
+SAMPLES = int(os.environ.get("VIDKIT_SAMPLES", "128"))
 DEVICE = os.environ.get("VIDKIT_CYCLES_DEVICE", "CUDA").upper()
 OUT_DIR = Path(sys.argv[-1]) if len(sys.argv) > 1 and not sys.argv[-1].startswith("-") else Path("outputs/surreal-jungle-dnb-720p")
 FRAMES_DIR = OUT_DIR / "frames"
@@ -159,7 +159,12 @@ def update_visibility(scene):
 bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete()
 scene=bpy.context.scene; scene.frame_start=1; scene.frame_end=TOTAL; scene.frame_set(1)
 scene.render.resolution_x=WIDTH; scene.render.resolution_y=HEIGHT; scene.render.fps=FPS
-scene.render.engine='CYCLES'; scene.cycles.samples=SAMPLES; scene.cycles.preview_samples=min(SAMPLES,16); scene.cycles.use_denoising=True; scene.cycles.max_bounces=4; scene.cycles.diffuse_bounces=1; scene.cycles.glossy_bounces=2; scene.cycles.transparent_max_bounces=4
+scene.render.engine='CYCLES'; scene.cycles.samples=SAMPLES; scene.cycles.preview_samples=min(SAMPLES,32); scene.cycles.use_denoising=True; scene.cycles.max_bounces=5; scene.cycles.diffuse_bounces=2; scene.cycles.glossy_bounces=3; scene.cycles.transparent_max_bounces=4
+try:
+    scene.cycles.use_persistent_data = True
+    print('[surreal-dnb] Cycles persistent data enabled')
+except Exception as exc:
+    print('[surreal-dnb] persistent data unavailable:', exc)
 scene.render.image_settings.file_format='PNG'; scene.render.filepath=str(FRAMES_DIR/'frame_'); scene.render.use_overwrite=False; scene.render.use_placeholder=True
 scene.view_settings.view_transform='Filmic'; scene.view_settings.look='High Contrast'; scene.view_settings.exposure=0; scene.view_settings.gamma=1
 world=bpy.context.scene.world or bpy.data.worlds.new('World'); bpy.context.scene.world=world; world.color=(0.005,0.006,0.014)

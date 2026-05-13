@@ -23,4 +23,4 @@ Outputs:
 - `outputs/surreal-jungle-dnb-720p/surreal-jungle-dnb-720p.render.log`
 - `outputs/surreal-jungle-dnb-720p/frames/`
 
-The script fails if no CUDA/OptiX-capable GPU is selected. Frame sequence output is intentional for resume/debug.
+The script fails if no CUDA/OptiX-capable GPU is selected. Default samples are intentionally GPU-heavy enough that CUDA does the main path-tracing work; lower `VIDKIT_SAMPLES` only for diagnostics. Frame sequence output is intentional for resume/debug.
