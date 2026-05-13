@@ -33,8 +33,9 @@ Use this when computment asks to make or edit videos programmatically.
    - use `animate` presets for common entrances/exits before hand-authoring keyframes
    - keep glitch/effects off foreground text unless explicitly requested
 4. Render with `vidkit` or `vidkit blender render` when 3D is the right backend. For GPU jobs, request the device explicitly and fail if it is unavailable; do not silently accept CPU fallback.
-5. Verify with the render log/device dump, `ffprobe`, a contact sheet, and one representative frame when visual quality matters.
-6. Send the output video with the message tool.
+5. For remote RTX/Blender jobs, optimize for **CPU-efficient / GPU-offloaded rendering**. CUDA in the log is not enough if CPU is pegged and GPU is underused.
+6. Verify with the render log/device dump, first-frame/frame-time telemetry when remote, `ffprobe`, a contact sheet, and one representative frame when visual quality matters.
+7. Send the output video with the message tool.
 
 ## Built-in templates
 
@@ -53,6 +54,29 @@ vidkit show template:media-card
 vidkit init media-card artifacts/vidkit/starter.json
 vidkit template:media-card artifacts/vidkit/media-card.mp4
 ```
+
+## CPU-efficient GPU render rules
+
+When rendering on a machine with an RTX GPU, the goal is not merely “can Blender see CUDA”; the goal is that CPU orchestration does not dominate the render.
+
+Prefer:
+
+- separate scene/biome clips assembled afterward
+- instancing/linked duplicates/procedural repetition for dense worlds
+- static/reused geometry where possible so persistent data/BVH reuse helps
+- baked/precomputed animation instead of per-frame Python handlers
+- frame-sequence output before MP4 encode
+- early benchmark: confirm GPU carries the render and CPU is not pegged
+
+Avoid:
+
+- one huge Blender file with every scene loaded and hidden/unhidden over time
+- thousands of unique animated objects when instances would work
+- per-frame Python visibility/state handlers during render
+- “fixing” CPU-bound renders by only increasing samples
+- letting a long render continue when CPU is ~90% and GPU is low
+
+Dense visuals are still desired. Use GPU-friendly instancing and clip structure rather than reducing visual ambition.
 
 ## Verification
 
