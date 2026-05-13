@@ -1,0 +1,242 @@
+{
+  "size": "1280x720",
+  "fps": 24,
+  "duration": 4.0,
+  "engine": "cycles",
+  "world": {
+    "color": "#02030a",
+    "ambient": 0.03
+  },
+  "camera": {
+    "location": [
+      0,
+      -7.2,
+      3.0
+    ],
+    "look_at": [
+      0,
+      0,
+      0.4
+    ],
+    "lens": 34,
+    "path": {
+      "type": "orbit",
+      "target": [
+        0,
+        0,
+        0.35
+      ],
+      "radius": 7.2,
+      "height": 3.0,
+      "start_degrees": -34,
+      "end_degrees": 42
+    }
+  },
+  "lights": [
+    {
+      "type": "area",
+      "name": "cyan window",
+      "location": [
+        -3.8,
+        -3.0,
+        5.0
+      ],
+      "rotation": [
+        60,
+        0,
+        -35
+      ],
+      "energy": 550,
+      "size": 5.0,
+      "color": "#00d8ff"
+    },
+    {
+      "type": "point",
+      "name": "magenta core",
+      "location": [
+        2.4,
+        1.2,
+        2.2
+      ],
+      "energy": 280,
+      "color": "#ff4fd8"
+    },
+    {
+      "type": "point",
+      "name": "emerald glint",
+      "location": [
+        -1.2,
+        2.0,
+        1.1
+      ],
+      "energy": 120,
+      "color": "#5dffb4"
+    }
+  ],
+  "objects": [
+    {
+      "type": "plane",
+      "name": "black glass floor",
+      "location": [
+        0,
+        0,
+        -0.05
+      ],
+      "scale": [
+        8,
+        8,
+        1
+      ],
+      "material": {
+        "color": "#040713",
+        "metallic": 0.0,
+        "roughness": 0.18
+      }
+    },
+    {
+      "type": "torus",
+      "name": "signal halo",
+      "location": [
+        0,
+        0,
+        1.2
+      ],
+      "rotation": [
+        90,
+        0,
+        0
+      ],
+      "major_radius": 1.45,
+      "minor_radius": 0.035,
+      "material": {
+        "color": "#00d8ff",
+        "emission": "#00d8ff",
+        "strength": 2.8
+      },
+      "animate": {
+        "rotation": [
+          0,
+          0,
+          360
+        ]
+      }
+    },
+    {
+      "type": "torus",
+      "name": "magenta halo",
+      "location": [
+        0,
+        0,
+        1.2
+      ],
+      "rotation": [
+        72,
+        0,
+        0
+      ],
+      "major_radius": 1.05,
+      "minor_radius": 0.025,
+      "material": {
+        "color": "#ff4fd8",
+        "emission": "#ff4fd8",
+        "strength": 2.0
+      },
+      "animate": {
+        "rotation": [
+          0,
+          360,
+          0
+        ]
+      }
+    },
+    {
+      "type": "ico_sphere",
+      "name": "glass core",
+      "location": [
+        0,
+        0,
+        1.2
+      ],
+      "radius": 0.42,
+      "subdivisions": 3,
+      "material": {
+        "color": "#eaffff",
+        "emission": "#5dffb4",
+        "strength": 1.2,
+        "roughness": 0.05
+      }
+    },
+    {
+      "type": "cube",
+      "name": "left pillar",
+      "location": [
+        -2.2,
+        0.45,
+        1.35
+      ],
+      "scale": [
+        0.14,
+        0.14,
+        2.7
+      ],
+      "material": {
+        "color": "#06162b",
+        "emission": "#003f55",
+        "strength": 0.35
+      }
+    },
+    {
+      "type": "cube",
+      "name": "right pillar",
+      "location": [
+        2.2,
+        0.45,
+        1.35
+      ],
+      "scale": [
+        0.14,
+        0.14,
+        2.7
+      ],
+      "material": {
+        "color": "#06162b",
+        "emission": "#30003a",
+        "strength": 0.35
+      }
+    },
+    {
+      "type": "text",
+      "name": "tiny label",
+      "text": "VIDKIT / BLENDER BACKEND",
+      "location": [
+        -1.7,
+        -1.55,
+        0.08
+      ],
+      "rotation": [
+        74,
+        0,
+        0
+      ],
+      "size": 0.16,
+      "align": "CENTER",
+      "material": {
+        "color": "#ffffff",
+        "emission": "#00d8ff",
+        "strength": 1.0
+      }
+    }
+  ],
+  "samples": 64,
+  "denoise": false,
+  "render": {
+    "device": "cuda",
+    "fail_if_unavailable": true,
+    "output": "sequence",
+    "encode": true,
+    "denoise": false,
+    "use_cpu": false,
+    "placeholder_frames": true,
+    "overwrite_frames": false
+  }
+}

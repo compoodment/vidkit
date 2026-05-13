@@ -6,3 +6,5 @@ out.mp4
 *.log
 artifacts/
 verify/
+
+outputs/

@@ -12,6 +12,7 @@ COMPOSE = ROOT / "tools" / "vidkit-compose.py"
 HELPER = ROOT / "tools" / "vidkit-helper.py"
 VERIFY = ROOT / "tools" / "vidkit-verify.py"
 SELFTEST = ROOT / "tools" / "vidkit-selftest.py"
+BLENDER = ROOT / "tools" / "vidkit-blender.py"
 
 HELP = """vidkit - small scripted video toolkit
 
@@ -20,6 +21,7 @@ Usage:
   vidkit helper <vidkit-helper args>
   vidkit verify
   vidkit selftest
+  vidkit blender <vidkit-blender args>
 
 Shortcuts:
   vidkit templates
@@ -70,6 +72,8 @@ def main(argv: list[str] | None = None) -> int:
         return run(VERIFY, args[1:])
     if cmd == "selftest":
         return run(SELFTEST, args[1:])
+    if cmd == "blender":
+        return run(BLENDER, args[1:])
     if cmd in COMPOSE_SHORTCUTS or cmd.startswith("template:") or cmd.endswith(".json"):
         return run(COMPOSE, args)
     if cmd in HELPER_SHORTCUTS:
