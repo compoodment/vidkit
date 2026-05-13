@@ -1,38 +1,81 @@
-# vidkit
+# Vidkit
 
-A tiny scripted motion-graphics/video assembly toolkit for AI assistants and command-line workflows.
+Vidkit is a small scripted video toolkit for AI assistants, automation, and command-line workflows.
 
-It is not an interactive editor. It renders videos from JSON scene specs using Python + ffmpeg: generated visuals, media layers, text/lower-thirds, transitions, audio, keyframes, rounded masks, and glitch effects.
+It is not an interactive editor. It renders videos from structured specs and helper commands, then verifies the output with ffmpeg/ffprobe. The core toolchain is dependency-light and deterministic; optional Blender support adds real 3D scene rendering when a Blender binary is available.
+
+Vidkit currently covers three lanes:
+
+- **Compose**: JSON-driven motion graphics, generated scenes, layered media, text, lower-thirds, UI/fake-app scenes, transitions, audio cues, and audio beds.
+- **Helper**: practical ffmpeg operations such as trim, contact sheets, frame extraction, GIF export, muxing, subtitles, scale/crop, title cards, fades, slideshows, remixes, and QA bundles.
+- **Blender**: optional 3D scene specs that validate without Blender, emit Blender Python, or render through Blender/Cycles/EEVEE when installed.
 
 ## Requirements
 
+Core compose/helper workflows:
+
 - Python 3.11+
 - `ffmpeg` and `ffprobe` on PATH
+- no Python package dependencies
 
-No Python package dependencies are required.
+Optional 3D rendering:
 
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor standards, issue quality expectations, feature design guidance, and verification rules.
+- Blender on PATH, or pass `--blender /path/to/blender`
+- for GPU renders, use a Blender build with CUDA/OptiX support and request the device explicitly
 
 ## Quick start
 
+From the repository root:
+
 ```bash
-python3 tools/vidkit-compose.py templates
-python3 tools/vidkit-compose.py template:media-card out.mp4
-python3 tools/vidkit-compose.py init media-card starter.json
-python3 tools/vidkit-verify.py
+python3 tools/vidkit.py templates
+python3 tools/vidkit.py template:media-card out.mp4
+python3 tools/vidkit.py init media-card starter.json
+python3 tools/vidkit.py verify
+python3 tools/vidkit.py selftest
 ```
 
-Optional local wrappers are included under `bin/`:
+Optional wrappers are included under `bin/`:
 
 ```bash
 export PATH="$PWD/bin:$PATH"
+vidkit templates
 vidkit template:band-glitch glitch.mp4
+vidkit qa glitch.mp4 --out artifacts/qa/glitch
 vidkit-selftest
 ```
 
-Core templates:
+Legacy direct scripts remain available:
+
+```bash
+python3 tools/vidkit-compose.py templates
+python3 tools/vidkit-helper.py contact input.mp4 contact.jpg
+python3 tools/vidkit-verify.py
+python3 tools/vidkit-selftest.py
+```
+
+## CLI layout
+
+```bash
+vidkit compose <vidkit-compose args>
+vidkit helper <vidkit-helper args>
+vidkit verify
+vidkit selftest
+vidkit blender <vidkit-blender args>
+```
+
+Common shortcuts:
+
+```bash
+vidkit templates
+vidkit template:<name> out.mp4
+vidkit contact in.mp4 out.jpg
+vidkit qa in.mp4 --out qa-dir
+```
+
+## Compose templates
+
+Built-in compose templates:
 
 - `lower-third`
 - `motion-card`
@@ -43,30 +86,25 @@ Core templates:
 - `chat-window`
 - `application-form`
 
-## Custom specs
-
-Render a JSON spec:
+Discover, inspect, initialize, and validate templates:
 
 ```bash
-python3 tools/vidkit-compose.py examples/vidkit.lower-third-example.json out.mp4
+vidkit templates
+vidkit show template:split-screen
+vidkit init split-screen starter.json
+vidkit validate template:split-screen
+vidkit --validate-only examples/vidkit.motion-polish-example.json
 ```
 
-Discover/export/validate without rendering:
+Render a custom spec:
 
 ```bash
-python3 tools/vidkit-compose.py templates
-python3 tools/vidkit-compose.py show template:split-screen
-python3 tools/vidkit-compose.py init split-screen starter.json
-python3 tools/vidkit-compose.py --validate-only examples/vidkit.motion-polish-example.json
-# or
-python3 tools/vidkit-compose.py validate template:split-screen
+vidkit examples/vidkit.motion-polish-example.json polish.mp4
 ```
 
-Specs can define generated scenes, layered media, text/panels, keyframes, transitions, generated audio, and audio-bed mixing. `init` writes a starter JSON file and copies bundled sample assets beside it so the starter validates outside the repo checkout.
+## Compose spec overview
 
-## Spec sketch
-
-Top-level fields:
+A minimal spec:
 
 ```json
 {
@@ -79,33 +117,33 @@ Top-level fields:
 
 Scene types:
 
-- generated: `card`, `bars`, `particles`, `wave`, `grid`, `orbits`, `typewriter`
+- generated visuals: `card`, `bars`, `particles`, `wave`, `grid`, `orbits`, `typewriter`
 - media: `image` / `media`
 - compositing: `layered`
-- utility beats: `beat`
+- utility timing/comedy: `beat`
 
 Layer types in a `layered` scene:
 
-- `media`: image/video layer with `source`, `fit`, `width`, `height`, `x`, `y`
-- `sprite`: clearer media-layer alias for image/video elements that move through a scene
-- `panel`: colored rectangle layer, useful for title cards and UI shapes
-- `lower_third`: panel preset plus text event defaults
-- `text`: subtitle/label event rendered through ASS subtitles
+- `media`: image/video layer with `source`, `fit`, sizing, and placement
+- `sprite`: media-layer alias for image/video elements that move through a scene
+- `panel`: colored rectangle layer for cards, UI, and backing plates
+- `lower_third`: readable caption/lower-third preset
+- `text`: subtitle/label event burned through ASS subtitles
 - `shape`: reusable primitives expanded into panel/text layers
-- `preset`: reusable text/dialog/stamp treatments expanded into panel/text/shape layers
+- `preset`: reusable UI/dialog/stamp treatments expanded into layers
 
-Media, sprite, and panel layers support:
+Layer features:
 
-- `opacity`: static or keyframed, `0..1`
-- `scale`: static or keyframed, media/sprite layers only for now
-- `radius`: rounded mask radius in pixels
-- `border`, `border_color`, `border_opacity`
+- static or keyframed `opacity`
+- static or keyframed media/sprite `scale`
+- rounded masks via `radius`
+- borders via `border`, `border_color`, `border_opacity`
 - `start` / `end` timing
-- `keyframes`: `time`, `x`, `y`, `opacity`, `scale`, `ease`
-- `animate`: preset entrance/exit animation
-- `sprite_animate`: media-layer helper animation presets expanded into the same keyframe path
+- `keyframes` for `time`, `x`, `y`, `opacity`, `scale`, and `ease`
+- `animate` entrance/exit presets
+- `sprite_animate` helper presets
 
-Sprite layers require `source` and otherwise render like media layers. They can use ordinary `keyframes`, or a `path` object that expands to `x`/`y` keyframes before rendering:
+Sprite path example:
 
 ```json
 {
@@ -125,19 +163,7 @@ Sprite layers require `source` and otherwise render like media layers. They can 
 }
 ```
 
-`path` currently supports only `type: "points"`. Points must be in increasing time order and within the scene duration. Use either `path` or explicit `keyframes` on a layer, not both.
-
-Supported easing values: `linear`, `in_quad`, `out_quad`, `in_out_quad`, `in_cubic`, `out_cubic`, `in_out_cubic` plus `ease_in`/`ease_out` aliases.
-
-Animation presets can be a string or object:
-
-```json
-{"animate": {"in": "pop", "out": "fade", "duration": 0.5}}
-```
-
-Supported presets: `fade`, `fade_in`, `fade_out`, `slide_left`, `slide_right`, `slide_up`, `slide_down`, `pop`, and `none`. `pop` uses scale, so it is media-only; slide/fade presets work on media and panel/lower-third layers.
-
-Layered scenes can define a scene-level `camera` object. Camera keyframes support `x`, `y`, and `scale`; optional `shake` supports `start`, `end`, `amount`, and `frequency`. The camera transform is applied to the composed non-text video before ASS subtitles and text layers are burned in, so ASS text remains screen-fixed and readable where practical. Non-text backing panels still move with the camera.
+Layered camera example:
 
 ```json
 {
@@ -154,62 +180,151 @@ Layered scenes can define a scene-level `camera` object. Camera keyframes suppor
 }
 ```
 
-Media layers can use `sprite_animate` as a string, object, or list of objects. Supported helper presets are `blink`, `bounce`, `jitter`, `squash`, `pop`, and `slap`; unsupported names fail validation. These helpers add keyframes unless the same property already has explicit keyframes.
+Supported easing values include `linear`, `in_quad`, `out_quad`, `in_out_quad`, `in_cubic`, `out_cubic`, and `in_out_cubic`.
 
-Shape layers use `"type": "shape"` with a `"shape"` name. First-pass shapes are `progress_bar`, `checkbox`, `arrow`, `cursor`, `speech_bubble`, `file_icon`, and `window`. Common fields include `x`, `y`, `width`, `height`, `start`, `end`, `opacity`, `color`, `fill`, `background`, `border_color`, and `radius`; shape-specific fields include `value` for `progress_bar`, `checked` for `checkbox`, `direction` for `arrow`, and `text` for `speech_bubble`.
+Animation presets include `fade`, `fade_in`, `fade_out`, `slide_left`, `slide_right`, `slide_up`, `slide_down`, `pop`, and `none`.
 
-Preset layers use `"type": "preset"` with a `"preset"` name. First-pass presets are `error_dialog`, `stamp`, `meme_caption`, `file_label`, `terminal_prompt`, `form_field`, and `warning_banner`. Presets are validated by name and require obvious text fields, then expand into existing shape/panel/text layers before render.
+Sprite helper presets include `blink`, `bounce`, `jitter`, `squash`, `pop`, and `slap`.
 
-Transitions: `fade`, `wipeleft`, `wiperight`, `slideleft`, `slideright`, `circleopen`, `circleclose`.
+Shape layers currently include `progress_bar`, `checkbox`, `arrow`, `cursor`, `speech_bubble`, `file_icon`, and `window`.
 
-Generated audio: `silence`, `tone`, `noise`, `pulse`, `sfx`. A top-level audio bed can mix generated or source audio under the rendered scenes. SFX presets are deterministic generated utility cues, not samples or production music: `bonk`, `error_beep`, `whoosh`, `censor_beep`, `printer_panic`, and `meow_ish`.
+Preset layers currently include `error_dialog`, `stamp`, `meme_caption`, `file_label`, `terminal_prompt`, `form_field`, and `warning_banner`.
 
-Beat scenes are short reusable comedy beats that expand into ordinary generated/layered scenes before rendering. Use `"type": "beat"` with a `"preset"` plus simple text/color/audio overrides. Supported beat presets are `hard_cut_card`, `bonk`, `censor_meow`, `zoom_punch`, and `error_flash`.
+Transitions include `fade`, `wipeleft`, `wiperight`, `slideleft`, `slideright`, `circleopen`, and `circleclose`.
+
+Generated audio includes `silence`, `tone`, `noise`, `pulse`, and `sfx`. SFX presets are deterministic utility cues, not production samples: `bonk`, `error_beep`, `whoosh`, `censor_beep`, `printer_panic`, and `meow_ish`.
+
+Beat scenes expand into ordinary generated/layered scenes:
 
 ```json
 {"type": "beat", "preset": "bonk", "duration": 0.75, "text": "BONK"}
 ```
 
-Each beat has a generated utility sound by default; set `"audio": {"type": "silence"}` or provide another generated audio object to override it.
+Supported beat presets include `hard_cut_card`, `bonk`, `censor_meow`, `zoom_punch`, and `error_flash`.
+
+## Blender backend
+
+The Blender backend is for real 3D shots: cameras, lights, materials, geometry, smooth temporal motion, and optional GPU rendering.
+
+It can validate and emit scripts without Blender installed:
+
+```bash
+vidkit blender templates
+vidkit blender show template:glass-orbit-cathedral
+vidkit blender init glass-orbit-cathedral scene.json
+vidkit blender validate scene.json
+vidkit blender script scene.json scene.py
+```
+
+Render with Blender:
+
+```bash
+vidkit blender render scene.json out.mp4 --blender /path/to/blender
+```
+
+For GPU/Cycles jobs, request the device explicitly and prefer image sequences for long renders:
+
+```bash
+vidkit blender render scene.json out.mp4 \
+  --device cuda \
+  --output-mode sequence \
+  --frames-dir frames \
+  --no-cpu-fallback
+```
+
+A GPU-intended job should fail if the requested GPU backend is unavailable. Do not accept silent CPU fallback for long renders.
+
+Blender spec support currently includes:
+
+- render size, FPS, duration, engine, world color
+- camera and look-at/orbit paths
+- lights
+- objects: cube, sphere/UV sphere, ico sphere, plane, torus, cylinder, cone, text
+- materials with color, emission, roughness, and metallic values
+- simple end-state animation for location, rotation, and scale
+
+Example:
+
+```bash
+vidkit blender validate examples/vidkit.blender-glass-orbit-cathedral.json
+vidkit blender script examples/vidkit.blender-glass-orbit-cathedral.json scene.py
+```
+
+## Render jobs
+
+`render-jobs/` contains deterministic handoff packets for remote or stronger render machines. A job folder usually includes:
+
+- a `README.md` with exact run instructions
+- a render script or scene spec
+- a `run.sh` wrapper
+- expected output paths
+
+Run the job from the repo root and return the MP4, ffprobe JSON, and render log. Render jobs should be benchmarked before long full renders when GPU/CPU utilization matters.
 
 ## Examples
 
 ```bash
-python3 tools/vidkit-compose.py examples/vidkit.example.json example.mp4
-python3 tools/vidkit-compose.py examples/vidkit.motion-example.json motion.mp4
-python3 tools/vidkit-compose.py examples/vidkit.motion-polish-example.json polish.mp4
-python3 tools/vidkit-compose.py examples/vidkit.animation-presets-example.json presets.mp4
-python3 tools/vidkit-compose.py examples/vidkit.camera-sprite-example.json camera-sprite.mp4
-python3 tools/vidkit-compose.py examples/vidkit.sprite-path-example.json sprite-path.mp4
-python3 tools/vidkit-compose.py examples/vidkit.shapes-presets-example.json shapes-presets.mp4
-python3 tools/vidkit-compose.py examples/vidkit.sfx-example.json sfx.mp4
-python3 tools/vidkit-compose.py examples/vidkit.comedy-beats-example.json comedy-beats.mp4
+vidkit examples/vidkit.example.json example.mp4
+vidkit examples/vidkit.lower-third-example.json lower-third.mp4
+vidkit examples/vidkit.motion-example.json motion.mp4
+vidkit examples/vidkit.motion-polish-example.json polish.mp4
+vidkit examples/vidkit.animation-presets-example.json presets.mp4
+vidkit examples/vidkit.camera-sprite-example.json camera-sprite.mp4
+vidkit examples/vidkit.sprite-path-example.json sprite-path.mp4
+vidkit examples/vidkit.shapes-presets-example.json shapes-presets.mp4
+vidkit examples/vidkit.sfx-example.json sfx.mp4
+vidkit examples/vidkit.comedy-beats-example.json comedy-beats.mp4
 ```
 
-`examples/assets/sample.ppm` is bundled so the examples and templates work without private local media.
+`examples/assets/sample.ppm` is bundled so examples and templates work without private local media.
 
 ## Helper tool
 
-`tools/vidkit-helper.py` provides practical ffmpeg helpers: trim, contact sheets, frame extraction, GIF export, mux audio, burn subtitles, crop/scale/rotate/speed/concat, title cards, captions, fades, slideshow, remix, and QA bundles.
+`tools/vidkit-helper.py` wraps practical ffmpeg tasks:
+
+- trim
+- contact sheets
+- frame extraction
+- GIF export
+- mux audio
+- burn subtitles
+- crop/scale/rotate/speed/concat
+- title cards and captions
+- fades, slideshows, remixes
+- QA bundles
+
+QA example:
 
 ```bash
-python3 tools/vidkit.py qa input.mp4 --out artifacts/qa/input
+vidkit qa input.mp4 --out artifacts/qa/input
 ```
 
-The QA bundle writes `probe.json`, `contact.jpg`, representative `frame-*.jpg` stills, `audio-levels.txt` from `volumedetect`, and `summary.json`. When an audio stream exists, `summary.json` marks it `effectively_silent` if `max_volume` is at or below `-50 dBFS` by default.
+The QA bundle writes `probe.json`, `contact.jpg`, representative `frame-*.jpg` stills, `audio-levels.txt`, and `summary.json`. When an audio stream exists, `summary.json` marks it `effectively_silent` if `max_volume` is at or below `-50 dBFS` by default.
 
 ## Verification
 
+Run the broad verifier:
+
 ```bash
-python3 tools/vidkit-verify.py
+vidkit verify
 ```
 
-The verifier validates and renders the built-in templates, probes H.264/AAC streams with `ffprobe`, and creates contact sheets for selected templates. `tools/vidkit-selftest.py` adds focused behavioral checks for template listing/export, validation, opacity keyframes, animation presets, SFX, and beat presets.
+Run focused selftests:
+
+```bash
+vidkit selftest
+```
+
+The verifier validates and renders the built-in templates, probes H.264/AAC streams with `ffprobe`, and creates contact sheets for selected templates. The selftest covers template listing/export, validation, opacity keyframes, animation presets, SFX, beat presets, and Blender script/validation behavior.
 
 ## OpenClaw skill
 
 A draft AgentSkill is included at `skill/SKILL.md` for local OpenClaw usage.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor standards, issue quality expectations, feature design guidance, and verification rules.
+
 ## Status
 
-Early and intentionally small. Built to stay dependency-light and assistant-friendly.
+Vidkit is early and intentionally small. The core compose/helper tools are stable enough for scripted assistant workflows. The Blender backend and render-job workflow are experimental but usable for controlled 3D render handoffs.
